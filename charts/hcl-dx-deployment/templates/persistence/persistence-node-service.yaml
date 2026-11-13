@@ -1,0 +1,47 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: persistence
+
+{{- if eq (include "hcl-dx-deployment.persistenceEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  {{- if (.Values.annotations.service.persistenceNode) }}
+  {{- range $customAnnotationValue := .Values.annotations.service.persistenceNode }}
+    {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  name: "{{ .Release.Name }}-persistence-headless-svc"
+  labels:
+    app: "{{ .Release.Name }}-persistence-node"
+  {{- if (.Values.labels.service.persistenceNode) }}
+  {{- range $customLabelValue := .Values.labels.service.persistenceNode }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+  {{- end }}
+  {{- end }}
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  type: "ClusterIP"
+  clusterIP: "None"
+  ports:
+    - name: "persistence"
+      port: {{ include "hcl-dx-deployment.ports.persistence.repmgr" . }}
+  publishNotReadyAddresses: true
+  selector:
+    app: "{{ .Release.Name }}-persistence-node"
+
+{{- end }}

@@ -1,0 +1,32 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: ServiceMonitor
+# For Service: Digital Asset Management
+
+{{- if and (eq (include "hcl-dx-deployment.digitalAssetManagementEnabled" .) "true") (.Values.metrics.digitalAssetManagement.scrape) (eq (.Values.metrics.digitalAssetManagement.prometheusDiscoveryType) "serviceMonitor")}}
+
+apiVersion: "monitoring.coreos.com/v1"
+kind: "ServiceMonitor"
+metadata:
+  name: "{{ .Release.Name }}-digital-asset-management"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-digital-asset-management"
+  endpoints:
+    - targetPort: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+      path: /probe/metrics
+
+{{- end }}

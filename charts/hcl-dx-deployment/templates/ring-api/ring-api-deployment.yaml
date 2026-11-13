@@ -1,0 +1,209 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2025. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Deployment incl. Pods
+# For Service: RingAPI
+
+{{- if eq (include "hcl-dx-deployment.ringApiEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "{{ .Release.Name }}-ring-api"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  {{- if (.Values.scaling) }}
+  {{- if (.Values.scaling.replicas) }}  
+  replicas: {{ .Values.scaling.replicas.ringApi }}
+  {{- end }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-ring-api"
+  template:
+    metadata:
+      annotations: 
+      {{- if (.Values.annotations.pod.ringApi) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.ringApi }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config-ring-api: "{{- include "hcl-dx-deployment.ringApiConfig" . | sha256sum }}"
+        {{- if and (.Values.metrics.ringApi.scrape) (eq (.Values.metrics.ringApi.prometheusDiscoveryType) "annotation") }}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/probe/metrics"
+        prometheus.io/port: "{{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}"
+        {{- end }}
+      labels:
+      {{- if (.Values.labels.pod.ringApi) }}
+      {{- range $customLabelValue := .Values.labels.pod.ringApi }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-ring-api"
+        # Using general labels, see _deployment_helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.ringApi)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.ringApi) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.ringApi)}}
+      affinity:
+        {{- toYaml (.Values.affinity.ringApi) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.ringApi)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.ringApi) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.ringApi)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.ringApi) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.ringApi)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.ringApi) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.ringApi)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.ringApi) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: "ring-api"
+          # Build the image attribute by using the repository and image tag
+          {{- if (.Values.images.tags) }}
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.ringApi }}:{{ .Values.images.tags.ringApi }}"
+          {{- end }}
+          # Adjust the image pull policy based on the CHart value
+          {{- if (.Values.images) }}
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          {{- end }}
+          # Environment parameters
+          env:
+          {{- if (.Values.environment.pod.ringApi) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.ringApi }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (eq (include "hcl-dx-deployment.isHybridDeployment" .) "false") }}
+            - name: "NODE_TLS_REJECT_UNAUTHORIZED"
+              value: "0"
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.ringApi | quote }}
+          # CA Cert Changes
+          {{- if (.Values.networking.addon.ringApi.caTrustSecret) }}
+            - name: NODE_EXTRA_CA_CERTS
+              value: "/etc/ca-trust-cert/customCACert.pem"
+          {{- end }}  
+          # Port exposure configuration
+          ports:
+            - name: "ring-api"
+              containerPort: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.ringApi) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/probe/live"
+              port: 3000
+              scheme: "HTTP"
+          {{- with .Values.probes.ringApi.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.ringApi) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/probe/ready"
+              port: 3000
+              scheme: "HTTP"
+          {{- with .Values.probes.ringApi.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if and (.Values.resources) (.Values.resources.ringApi) }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.ringApi.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.ringApi.requests.cpu }}"
+              memory: "{{ .Values.resources.ringApi.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.ringApi.limits) }}
+            limits:
+              {{- if (.Values.resources.ringApi.limits.cpu) }}
+              cpu: "{{ .Values.resources.ringApi.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.ringApi.limits.memory) }}
+              memory: "{{ .Values.resources.ringApi.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+          # Volume Mount for CA Cert
+          {{- if (.Values.networking.addon.ringApi.caTrustSecret) }}
+          - name: "ca-trust-cert"
+            mountPath: "/etc/ca-trust-cert"
+            readOnly: true
+          {{- end }}
+      volumes:
+        - name: "config"
+          configMap:
+            name: "{{ .Release.Name }}-ring-api"
+        - name: "global-config"
+          configMap:
+            name: "{{ .Release.Name }}-global"
+        # only mount RING cert secret if specified in values.yaml
+        {{- if (.Values.networking.addon.ringApi.caTrustSecret) }}
+        - name: "ca-trust-cert"
+          secret:
+            secretName: "{{ .Values.networking.addon.ringApi.caTrustSecret }}"
+        {{- end }}
+
+{{- end }}

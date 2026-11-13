@@ -1,0 +1,44 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: People Service
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hcl-people-service.fullname" . }}
+  annotations: 
+  {{- if (.Values.annotations.service) }}
+  {{- range $customAnnotationValue := .Values.annotations.service }}
+    {{ $customAnnotationValue.key }}: {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}  
+  labels:
+    app: {{ include "hcl-people-service.fullname" . }}
+    {{- if (.Values.labels.service) }}
+    {{- range $customLabelValue := .Values.labels.service }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+    {{- end }}
+    {{- end }}
+    {{- include "hcl-people-service.labels" . | nindent 4 }}
+spec:
+  type: {{ ternary "ClusterIP" .Values.service.type .Values.networking.ingress.enabled }}
+  ports: 
+    - name: http
+      protocol: TCP
+      port: {{ .Values.service.ports.http }}
+      targetPort: {{ .Values.containerPorts.http }}
+      {{- if (and (not .Values.networking.ingress.enabled) (eq .Values.service.type "NodePort") .Values.service.ports.nodePort) }}
+      nodePort: {{ .Values.service.ports.nodePort }}
+      {{- end }}
+  selector:
+    app: {{ include "hcl-people-service.fullname" . }}

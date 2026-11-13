@@ -1,0 +1,44 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: image-processor
+
+{{- if eq (include "hcl-dx-deployment.imageProcessorEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-image-processor"
+  annotations: 
+  {{- if (.Values.annotations.service.imageProcessor) }}
+  {{- range $customAnnotationValue := .Values.annotations.service.imageProcessor }}
+    {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  labels:
+    app: "{{ .Release.Name }}-image-processor"
+  {{- if (.Values.labels.service.imageProcessor) }}
+  {{- range $customLabelValue := .Values.labels.service.imageProcessor }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+  {{- end }}
+  {{- end }}
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  type: "ClusterIP"
+  ports:
+    - name: "image-processor"
+      port: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+  selector:
+    app: "{{ .Release.Name }}-image-processor"
+
+{{- end }}

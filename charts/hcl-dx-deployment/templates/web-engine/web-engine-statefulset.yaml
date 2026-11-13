@@ -1,0 +1,575 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024, 2026. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+ 
+# This template creates:
+# Resources: StatefulSet incl. Pods and PVC for transaction logs
+# For Service: WebEngine
+
+{{- include "hcl-dx-deployment.checkCoreOrWebEngineEnabled" . }}
+{{- include "hcl-dx-deployment.checkWebEngineAndCoreSwitchDuringUpgrade" . -}}
+{{- include "hcl-dx-deployment.checkWebEngineReplicasWithExternalDB" . -}}
+{{- if eq (include "hcl-dx-deployment.webEngineEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "StatefulSet"
+metadata:
+  name: "{{ .Release.Name }}-web-engine"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  {{- if (.Values.scaling.replicas) }}  
+  replicas: {{ .Values.scaling.replicas.webEngine }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-web-engine"
+  serviceName: "{{ .Release.Name }}-web-engine"
+  # Per pod volume claims
+  volumeClaimTemplates:
+    {{- if (.Values.volumes) }}
+    {{- if (.Values.volumes.webEngine) }}
+    {{- if (.Values.volumes.webEngine.customization) }}
+    # Customization PVC
+    - metadata:
+        name: "customization"
+      spec:
+        accessModes: 
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "{{ .Values.volumes.webEngine.customization.requests.storage }}"
+        storageClassName:  "{{ .Values.volumes.webEngine.customization.storageClassName }}"
+        {{ if .Values.volumes.webEngine.customization.selector }}
+        selector: {{- toYaml (.Values.volumes.webEngine.customization.selector) | nindent 10 }}
+        {{ end }}
+        {{ if .Values.volumes.webEngine.customization.volumeName }}
+        volumeName: "{{ .Values.volumes.webEngine.customization.volumeName }}"
+        {{ end }}
+    {{- end }}
+    {{- if (.Values.volumes.webEngine.log) }}
+    # Application log PVC
+    - metadata:
+        name: "log"
+      spec:
+        accessModes: 
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "{{ .Values.volumes.webEngine.log.requests.storage }}"
+        storageClassName:  "{{ .Values.volumes.webEngine.log.storageClassName }}"
+        {{ if .Values.volumes.webEngine.log.selector }}
+        selector: {{- toYaml (.Values.volumes.webEngine.log.selector) | nindent 10 }}
+        {{ end }}
+        {{ if .Values.volumes.webEngine.log.volumeName }}
+        volumeName: "{{ .Values.volumes.webEngine.log.volumeName }}"
+        {{ end }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+  template:
+    metadata:
+      annotations:
+      {{- if (.Values.annotations.pod.webEngine) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.webEngine }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config-web-engine: "{{- include "hcl-dx-deployment.webEngineConfig" . | sha256sum }}"
+        checksum/dbdomain-properties: "{{- include "hcl-dx-deployment.dbDomainSecret" . | sha256sum }}"
+        checksum/dbtype-properties: "{{- include "hcl-dx-deployment.dbTypeSecret" . | sha256sum }}"
+        checksum/jvm-options: "{{- include "hcl-dx-deployment.webEngineJvmOptions" . | sha256sum }}"
+        checksum/properties-overrides: "{{- include "hcl-dx-deployment.webEnginePropertiesOverrides" . | sha256sum }}"
+        {{- if and (.Values.metrics.webEngine.scrape) (eq (.Values.metrics.webEngine.prometheusDiscoveryType) "annotation") }}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "{{ include "hcl-dx-deployment.ports.webEngine.metrics" . }}"
+        {{- end }}
+      labels:
+      {{- if (.Values.labels.pod.webEngine) }}
+      {{- range $customLabelValue := .Values.labels.pod.webEngine }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-web-engine"
+            # Using general labels, see _deployment_helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.webEngine)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.webEngine) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.webEngine)}}
+      affinity:
+        {{- toYaml (.Values.affinity.webEngine) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.webEngine)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.webEngine) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.webEngine)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.webEngine) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.webEngine)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.webEngine) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.webEngine)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.webEngine) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      # WebEngine termination grace period
+      # Allows WebEngine to stop all JVMs
+      terminationGracePeriodSeconds: 180
+      securityContext:
+        fsGroup: 1001
+        runAsUser: 1000
+        runAsGroup: 1001
+        runAsNonRoot: true
+        supplementalGroups:
+        - 1001
+      containers:
+        - name: "web-engine"
+          # Build the image attribute by using the repository and image tag
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.webEngine }}:{{ .Values.images.tags.webEngine }}"
+          # Adjust the image pull policy based on the Chart value
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          {{- if .Values.configuration.webEngine.customSecrets }}
+          # Add environment variables from customSecrets
+          envFrom:
+          {{- range $key, $secretName := .Values.configuration.webEngine.customSecrets }}
+            - secretRef:
+                name: {{ $secretName }}
+          {{- end }}
+          {{- end }}
+          # Environment parameters
+          env:
+          {{- if (.Values.environment.pod.webEngine) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.webEngine }} 
+            - name: {{ $customEnvironmentValue.name }}
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "CONFIG_CHECKSUM"
+              value: "{{- include "hcl-dx-deployment.webEngineConfig" . | sha256sum }}"
+            - name: "DX_ADMIN"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-web-engine-wps"
+            - name: "DX_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-web-engine-wps"
+            - name: "AI_ENABLED"
+              value: "{{ .Values.configuration.webEngine.contentAI.enabled }}"
+            - name: "NEW_CONTEXT_ROOT"
+              value: "{{ .Values.networking.webEngine.contextRoot }}"
+            # AI API Key configuration
+            {{- if .Values.configuration.webEngine.contentAI.enabled }}
+            - name: "CONTENT_AI_PROVIDER"
+              value: "{{ .Values.configuration.webEngine.contentAI.provider }}"
+            - name: "CONTENT_AI_PROVIDER_API_KEY"
+              valueFrom:
+                secretKeyRef:
+                  key: "apiKey"
+                  name: "{{ .Release.Name }}-web-engine-content-ai"
+            {{- if (eq (.Values.configuration.webEngine.contentAI.provider) "CUSTOM") }}
+            - name: "CUSTOM_AI_CLASSNAME"
+              value: "{{ .Values.configuration.webEngine.contentAI.className }}"
+            {{ end }}
+            {{ end }}
+            {{- if .Values.configuration.webEngine.ltpa.customLtpaSecret }}
+            - name: "LTPA_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: {{ .Values.configuration.webEngine.ltpa.customLtpaSecret }}
+            {{- end }}
+            {{- if or (eq (include "hcl-dx-deployment.ldapWebEngineConfigurationEnabled" .) "true") .Values.applications.openLdap }}
+            - name: "LDAP_BIND_USER"
+              valueFrom:
+                secretKeyRef:
+                  key: "bindUser"
+                  name: "{{ .Release.Name }}-web-engine-ldap"
+            - name: "LDAP_BIND_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "bindPassword"
+                  name: "{{ .Release.Name }}-web-engine-ldap"
+            {{- end }}
+            # OpenSearch search middleware enabled or not
+            - name: "WEBENGINE_NEWSEARCH_ENABLED"
+              value: "{{ .Values.configuration.searchMiddleware.enabled }}"
+            # Maintenace mode setting
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.webEngine | quote }}
+          # Port exposure configuration
+          ports:
+            - name: "dx-home"
+              containerPort: {{ include "hcl-dx-deployment.ports.webEngine.dxHome" . }}
+            - name: "dx-home-sec"
+              containerPort: {{ include "hcl-dx-deployment.ports.webEngine.dxHomeSecure" . }}
+            - name: "web-engine-soap"
+              containerPort: {{ include "hcl-dx-deployment.ports.webEngine.soap" . }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.webEngine) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+          {{- with .Values.probes.webEngine.livenessProbe }}
+            exec:
+              command:
+              - /bin/sh
+              - /opt/openliberty/wlp/usr/svrcfg/scripts/probe/liveness.sh
+            failureThreshold: {{ .failureThreshold }}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+            successThreshold: {{ .successThreshold }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+          {{- end }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.webEngine) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+          {{- with .Values.probes.webEngine.readinessProbe }}
+            exec:
+              command:
+              - /bin/sh
+              - /opt/openliberty/wlp/usr/svrcfg/scripts/probe/readiness.sh
+            failureThreshold: {{ .failureThreshold }}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+            successThreshold: {{ .successThreshold }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+          {{- end }}
+          {{- end }}
+          # Startup probe
+          startupProbe:
+          {{- if (.Values.maintenanceMode.webEngine) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+          {{- with .Values.probes.webEngine.startupProbe }}
+            exec:
+              command:
+              - /bin/sh
+              - /opt/openliberty/wlp/usr/svrcfg/scripts/probe/liveness.sh
+            failureThreshold: {{ .failureThreshold }}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+            successThreshold: {{ .successThreshold }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+          {{- end }}
+          {{- end }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.webEngine.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.webEngine.requests.cpu }}"
+              memory: "{{ .Values.resources.webEngine.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.webEngine.limits) }}
+            limits:
+              {{- if (.Values.resources.webEngine.limits.cpu) }}
+              cpu: "{{ .Values.resources.webEngine.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.webEngine.limits.memory) }}
+              memory: "{{ .Values.resources.webEngine.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "customization"
+            mountPath: "/opt/openliberty/wlp/usr/servers/defaultServer/customization"
+          - name: "log"
+            mountPath: "/opt/openliberty/wlp/usr/servers/defaultServer/logs"
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "overrides"
+            mountPath: /opt/openliberty/wlp/usr/servers/defaultServer/configDropins/overrides
+            readOnly: true
+          - name: "properties-overrides"
+            mountPath: /opt/openliberty/wlp/usr/servers/defaultServer/properties-overrides
+            readOnly: true
+          - name: "jvm-options"
+            mountPath: /opt/openliberty/wlp/usr/servers/defaultServer/jvm.options
+            subPath: jvm.options
+          {{- if .Values.configuration.webEngine.ltpa.customLtpaSecret }}
+          - name: "ltpa"
+            mountPath: /mnt/ltpa/ltpa.keys
+            subPath: ltpa.keys
+          {{- end }}
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+          - name: "dbdomain"
+            mountPath: "/opt/openliberty/wlp/usr/svrcfg/properties/dx_dbdomain.properties"
+            subPath: dx_dbdomain.properties
+          - name: "dbtype"
+            mountPath: "/opt/openliberty/wlp/usr/svrcfg/properties/dx_dbtype.properties"
+            subPath: dx_dbtype.properties
+          {{- if .Values.configuration.webEngine.customSecrets }}
+          {{- range $key, $secretName := .Values.configuration.webEngine.customSecrets }}
+          - name: "custom-secret-{{ $key }}"
+            mountPath: "/mnt/customSecrets/{{ $key }}"
+          {{- end -}}
+          {{- end }}
+          {{- if .Values.configuration.webEngine.customKeystoreSecrets }}
+          {{- range $key, $secret := .Values.configuration.webEngine.customKeystoreSecrets }}
+          # Keystore Secrets Mount
+          - name: "keystore-secret-{{ $key }}"
+            mountPath: "/mnt/certs/keystores/{{ $key }}"
+          {{- end }}
+          {{- end }}
+          {{- if .Values.configuration.webEngine.customTruststoreSecrets }}
+          {{- range $key, $secret := .Values.configuration.webEngine.customTruststoreSecrets }}
+          # Truststore Secrets Mount
+          - name: "truststore-secret-{{ $key }}"
+            mountPath: "/mnt/certs/truststores/{{ $key }}"
+          {{- end }}
+          {{- end }}
+          {{- range $customPVC := .Values.volumes.webEngine.customPVCs }}
+          - name: "custom-{{ $customPVC.name }}"
+            mountPath: "{{ $customPVC.mountPath }}"
+          {{- end }}
+          {{- if $.Values.incubator.consumeSharedConfigs }}
+          {{- range $sharedConfig := $.Values.incubator.consumeSharedConfigs }}
+          {{- $minVer := int $sharedConfig.minVersion }}
+          {{- $maxVer := int $sharedConfig.maxVersion }}
+          {{- range $ver := untilStep (int $minVer) (int (add $maxVer 1)) 1 }}
+          # Optional volume mount for shared config from co-deployed products (LEAP, MX, etc.)
+          # Mounting v{{ $ver }} in range v{{ $minVer }} to v{{ $maxVer }}
+          - name: "{{ $sharedConfig.name }}-v{{ $ver }}"
+            mountPath: "/mnt/shared-config/{{ $sharedConfig.name }}-v{{ $ver }}"
+            readOnly: true
+          {{- end }}
+          {{- end }}
+          {{- end }}
+        # Default logging sidecar containers 
+        - name: "system-out-log"
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.loggingSidecar }}:{{ .Values.images.tags.loggingSidecar }}"
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          env:
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.webEngine | quote }}
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '/var/logs/SystemOut.log'"]
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.loggingSidecar.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.loggingSidecar.requests.cpu }}"
+              memory: "{{ .Values.resources.loggingSidecar.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.loggingSidecar.limits) }}
+            limits:
+              {{- if .Values.resources.loggingSidecar.limits.cpu }}
+              cpu: "{{ .Values.resources.loggingSidecar.limits.cpu }}"
+              {{- end }}
+              {{- if .Values.resources.loggingSidecar.limits.memory }}
+              memory: "{{ .Values.resources.loggingSidecar.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "log"
+            mountPath: "/var/logs"
+        - name: "trace-log"
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.loggingSidecar }}:{{ .Values.images.tags.loggingSidecar }}"
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          env:
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.webEngine | quote }}
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '/var/logs/trace.log'"]
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.loggingSidecar.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.loggingSidecar.requests.cpu }}"
+              memory: "{{ .Values.resources.loggingSidecar.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.loggingSidecar.limits) }}
+            limits:
+              {{- if (.Values.resources.loggingSidecar.limits.cpu) }}
+              cpu: "{{ .Values.resources.loggingSidecar.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.loggingSidecar.limits.memory) }}
+              memory: "{{ .Values.resources.loggingSidecar.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "log"
+            mountPath: "/var/logs"
+        # Additional custom logging sidecar containers  (dynamically created from values)
+        {{ $repository := include "hcl-dx-deployment.imageRepository" . }}
+        {{ $imageName := .Values.images.names.loggingSidecar }}
+        {{ $imageTag := .Values.images.tags.loggingSidecar }}
+        {{ $pullPolicy := .Values.images.pullPolicy }}
+        {{- range $customLogSidecarContainer := .Values.logging.webEngine.customLogSidecarContainers }}
+        - name: {{ $customLogSidecarContainer.containerName }}
+          image: "{{ $repository }}/{{ $imageName }}:{{ $imageTag }}"
+          imagePullPolicy: "{{ $pullPolicy }}"
+          env:
+          {{- if ($.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ $.Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ $.Values.maintenanceMode.webEngine | quote }}
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '{{ $customLogSidecarContainer.logFilePath }}'"]
+          resources:
+            # Resource requests taken from value settings
+            {{- if ($.Values.resources.loggingSidecar.requests) }}
+            requests:
+              cpu: "{{ $.Values.resources.loggingSidecar.requests.cpu }}"
+              memory: "{{ $.Values.resources.loggingSidecar.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if ($.Values.resources.loggingSidecar.limits) }}
+            limits:
+              {{- if ($.Values.resources.loggingSidecar.limits.cpu) }}
+              cpu: "{{ $.Values.resources.loggingSidecar.limits.cpu }}"
+              {{- end }}
+              {{- if ($.Values.resources.loggingSidecar.limits.memory) }}
+              memory: "{{ $.Values.resources.loggingSidecar.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "log"
+            mountPath: "/var/logs"
+          # We mount this again in /opt/openliberty/wlp/usr/servers/defaultServer/logs to match the paths in the main container while still being backwards compatible to /var/logs
+          - name: "log"
+            mountPath: "/opt/openliberty/wlp/usr/servers/defaultServer/logs"
+          {{- range $customPVC := $.Values.volumes.webEngine.customPVCs }}
+          - name: "custom-{{ $customPVC.name }}"
+            mountPath: "{{ $customPVC.mountPath }}"
+          {{- end }}
+        {{- end }}
+      volumes:
+      - name: "customization"
+        persistentVolumeClaim:
+          claimName: "{{ .Release.Name }}-web-engine-customization"
+      - name: "config"
+        configMap:
+          name: "{{ .Release.Name }}-web-engine"
+      - name: "overrides"
+        configMap:
+          name: "{{ .Release.Name }}-web-engine-overrides"
+      - name: "properties-overrides"
+        configMap:
+          name: "{{ .Release.Name }}-web-engine-properties-overrides"
+      - name: "jvm-options"
+        configMap:
+          name: "{{ .Release.Name }}-web-engine-jvm-options"
+      - name: "global-config"
+        configMap:
+          name: "{{ .Release.Name }}-global"
+      {{- if .Values.configuration.webEngine.ltpa.customLtpaSecret }}
+      - name: "ltpa"
+        secret:
+          secretName: {{ .Values.configuration.webEngine.ltpa.customLtpaSecret }}
+      {{- end }}
+      - name: "dbdomain"
+        secret:
+          {{- if .Values.configuration.webEngine.customDbDomainPropertiesSecret }}
+          secretName: "{{ .Values.configuration.webEngine.customDbDomainPropertiesSecret }}"
+          {{- else }}
+          secretName: "{{ .Release.Name }}-web-engine-dbdomain"
+          {{- end }}
+      - name: "dbtype"
+        secret:
+          {{- if .Values.configuration.webEngine.customDbTypePropertiesSecret }}
+          secretName: "{{ .Values.configuration.webEngine.customDbTypePropertiesSecret }}"
+          {{- else }}
+          secretName: "{{ .Release.Name }}-web-engine-dbtype"
+          {{- end }}
+      {{- range $customPVC := .Values.volumes.webEngine.customPVCs }}
+      - name: "custom-{{ $customPVC.name }}"
+        persistentVolumeClaim:
+          claimName: "{{ $.Release.Name }}-web-engine-custom-{{ $customPVC.name }}"
+      {{- end }}
+      {{- if .Values.configuration.webEngine.customSecrets }}
+      {{- range $key, $secretName := .Values.configuration.webEngine.customSecrets  }}
+      - name: "custom-secret-{{ $key }}"
+        secret:
+          secretName: {{ $secretName }}
+      {{- end -}}
+      {{- end }}
+      {{- if .Values.configuration.webEngine.customKeystoreSecrets }}
+      {{- range $key, $secretName := .Values.configuration.webEngine.customKeystoreSecrets }}
+      - name: keystore-secret-{{ $key }}
+        secret:
+          secretName: {{ $secretName }}
+      {{- end }}
+      {{- end }}
+
+      {{- if .Values.configuration.webEngine.customTruststoreSecrets }}
+      {{- range $key, $secretName := .Values.configuration.webEngine.customTruststoreSecrets }}
+      - name: truststore-secret-{{ $key }}
+        secret:
+          secretName: {{ $secretName }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.incubator.consumeSharedConfigs }}
+      {{- range $sharedConfig := .Values.incubator.consumeSharedConfigs }}
+      {{- $minVer := int $sharedConfig.minVersion }}
+      {{- $maxVer := int $sharedConfig.maxVersion }}
+      {{- range $ver := untilStep (int $minVer) (int (add $maxVer 1)) 1 }}
+      # Optional volume mount for shared config from co-deployed products (LEAP, MX, etc.)
+      # Mounting v{{ $ver }} in range v{{ $minVer }} to v{{ $maxVer }}
+      - name: "{{ $sharedConfig.name }}-v{{ $ver }}"
+        secret:
+          secretName: "{{ $sharedConfig.name }}-v{{ $ver }}"
+          optional: true
+      {{- end }}
+      {{- end }}
+      {{- end }}
+{{- end }}

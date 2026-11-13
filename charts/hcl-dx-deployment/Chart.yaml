@@ -1,0 +1,12 @@
+apiVersion: v2
+appVersion: 95_CF233
+dependencies:
+- alias: peopleservice
+  condition: peopleservice.enabled
+  name: hcl-people-service
+  repository: file://../hcl-people-service
+  version: 1.0.0
+description: Kubernetes Deployment of HCL Digital Experience
+name: hcl-dx-deployment
+type: application
+version: 2.44.0

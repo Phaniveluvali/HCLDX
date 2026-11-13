@@ -1,0 +1,27 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates: if Web Engine is enabled
+# Resources: jvm.options
+# For Service: WebEngine
+
+{{- if eq (include "hcl-dx-deployment.webEngineEnabled" .) "true" }}
+apiVersion: "v1"
+kind: "ConfigMap"
+metadata:
+  name: "{{ .Release.Name }}-web-engine-jvm-options"
+  labels:
+    app: "{{ .Release.Name }}-web-engine"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+data:
+  jvm.options: |
+    {{- include "hcl-dx-deployment.webEngineJvmOptions" . | nindent 4 }}
+{{- end }}

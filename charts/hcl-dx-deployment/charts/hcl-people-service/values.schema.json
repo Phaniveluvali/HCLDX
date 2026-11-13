@@ -1,0 +1,1218 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "HCL People Service deployment",
+  "description": "This schema contains all configurable properties of the HCL People Service deployment Helm Chart.",
+  "type": "object",
+  "properties": {
+    "global": {
+      "title": "Global",
+      "description": "Global level configuration for SoFy",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "hclImagePullSecret": {
+          "title": "HclImagePullSecret",
+          "description": "Image pull secrets used for accessing the SoFy repository",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "hclImageRegistry": {
+          "title": "HclImageRegistry",
+          "description": "SoFy images registry path",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "persistence": {
+          "title": "Persistence",
+          "description": "Global property for persistence",
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "rwxStorageClassV3": {
+              "title": "rwxStorageClassV3",
+              "description": "SoFy storage class",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "image": {
+      "$ref": "#/definitions/imageSchema"
+    },
+    "configuration": {
+      "title": "Application Configuration",
+      "description": "Application configuration",
+      "$ref": "#/definitions/applicationConfigurationSchema"
+    },
+    "networking": {
+      "type": "object",
+      "title": "Networking Configuration",
+      "description": "Networking configuration",
+      "additionalProperties": false,
+      "properties": {
+        "ssl": {
+          "type": "object",
+          "title": "SSL Configuration",
+          "description": "SSL configuration for application",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "title": "Enable SSL",
+              "description": "Indicates if the application is accessible on http or https"
+            }
+          },
+          "required": [
+            "enabled"
+          ]
+        },
+        "host": {
+          "type": "string",
+          "title": "External Host",
+          "description": "Public qualified host url for the application"
+        },
+        "contextRoot": {
+          "type": "object",
+          "title": "Context Root",
+          "description": "Custom context root for the API and UI",
+          "properties": {
+            "api": {
+              "type": "string",
+              "title": "API Context Root",
+              "description": "Custom context root for the API"
+            },
+            "ui": {
+              "type": "string",
+              "title": "UI Context Root",
+              "description": "Custom context root for the UI"
+            }
+          }
+        },
+        "ingress": {
+          "type": "object",
+          "title": "Ingress Configuration",
+          "description": "Ingress configuration",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "title": "Enable Ingress",
+              "description": "Enable ingress"
+            },
+            "ingressClassName": {
+              "type": "string",
+              "title": "Ingress Class Name",
+              "description": "Ingress class name"
+            },
+            "pathType": {
+              "type": "string",
+              "title": "Path Type",
+              "description": "Path type",
+              "enum": [
+                "Prefix",
+                "Exact"
+              ]
+            },
+            "autoGenerateSelfSignedCert": {
+              "type": "boolean",
+              "title": "Auto Generate Self Signed Certificate",
+              "description": "Auto generate self signed certificate"
+            },
+            "existingSecret": {
+              "type": "string",
+              "title": "Existing Secret for TLS certificate",
+              "description": "Existing secret for TLS certificate"
+            },
+            "annotations": {
+              "type": "object",
+              "title": "Ingress Annotations",
+              "description": "Ingress annotations",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "required": [
+        "ssl", 
+        "host", 
+        "contextRoot"
+      ]
+    },
+    "ldap": {
+      "title": "LDAP Configuration",
+      "description": "LDAP configuration",
+      "$ref": "#/definitions/ldapSchema"
+    },
+    "userSynchronization": {
+      "title": "User Syncronization Configuration",
+      "description": "User syncronization configuration",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "title": "User Syncronization Enabled",
+          "description": "Enable user syncronization"
+        },
+        "strategy": {
+          "type": "string",
+          "title": "User Syncronization Strategy",
+          "description": "User syncronization strategy",
+          "enum": [
+            "none",
+            "sync"
+          ]
+        },
+        "cronSchedule": {
+          "type": "string",
+          "title": "User Syncronization Schedule",
+          "description": "User syncronization cron schedule"
+        },
+        "preventConcurrentExecution": {
+          "type": "boolean",
+          "title": "User Syncronization Concurrent Execution Prevention",
+          "description": "User Syncronization Concurrent Execution Prevention"
+        }
+      },
+      "required": [
+        "enabled",
+        "strategy",
+        "cronSchedule"
+      ]
+    },
+    "externalDatabase": {
+      "type": "object",
+      "title": "External Database Configuration",
+      "description": "External database configuration",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string",
+          "title": "Host",
+          "description": "Database host"
+        },
+        "port": {
+          "type": "integer",
+          "title": "Port",
+          "description": "Database port"
+        },
+        "database": {
+          "type": "string",
+          "title": "Database",
+          "description": "Database name"
+        },
+        "user": {
+          "type": "string",
+          "title": "User",
+          "description": "Database user"
+        },
+        "password": {
+          "type": "string",
+          "title": "Password",
+          "description": "Database password"
+        },
+        "existingSecret": {
+          "type": "string",
+          "title": "Existing Secret",
+          "description": "Existing database secret"
+        },
+        "existingSecretUserKey": {
+          "type": "string",
+          "title": "Existing Secret User Key",
+          "description": "Existing secret user key"
+        },
+        "existingSecretPasswordKey": {
+          "type": "string",
+          "title": "Existing Secret Password Key",
+          "description": "Existing database secret password key"
+        }
+      },
+      "required": [
+        "host",
+        "port",
+        "database",
+        "user",
+        "password",
+        "existingSecret",
+        "existingSecretUserKey",
+        "existingSecretPasswordKey"
+      ]
+    },
+    "containerPorts": {
+      "type": "object",
+      "title": "Container Ports",
+      "description": "Container ports",
+      "additionalProperties": false,
+      "properties": {
+        "http": {
+          "type": "integer",
+          "title": "HTTP",
+          "description": "HTTP port"
+        }
+      },
+      "required": [
+        "http"
+      ]
+    },
+    "service": {
+      "type": "object",
+      "title": "Service Configuration",
+      "description": "Service configuration",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "title": "Type",
+          "description": "Service type",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer"
+          ]
+        },
+        "ports": {
+          "type": "object",
+          "title": "Service Ports",
+          "description": "Service ports",
+          "properties": {
+            "http": {
+              "type": "integer",
+              "title": "Service HTTP Port",
+              "description": "Service http port"
+            },
+            "nodePort": {
+              "type": "integer",
+              "title": "Service Node Port",
+              "description": "Service node port"
+            }
+          },
+          "required": [
+            "http",
+            "nodePort"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "ports"
+      ]
+    },
+    "extraEnvVars": {
+      "type": "array",
+      "title": "Extra Environment Variables",
+      "description": "Extra environment variables",
+      "additionalProperties": false,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Environment Variable Name",
+            "description": "Environment variable name"
+          },
+          "value": {
+            "type": "string",
+            "title": "Environment Variable Value",
+            "description": "Environment variable value"
+          }
+        }
+      },
+      "logging": {
+        "type": "object",
+        "title": "Logging Configuration",
+        "description": "Logging configuration",
+        "properties": {
+          "level": {
+            "type": "string",
+            "title": "Logging Level",
+            "description": "Logging level"
+          }
+        }
+      }
+    },
+    "nodeSelector": {
+      "title": "Node Selector",
+      "description": "Node selector",
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "resources": {
+      "type": "object",
+      "title": "Resource Configuration",
+      "description": "Resource configuration",
+      "properties": {
+        "request": {
+          "$ref": "#/definitions/resourceRequestsSchema"
+        },
+        "limits": {
+          "$ref": "#/definitions/resourceLimitsSchema"
+        }
+      }
+    },
+    "annotations": {
+      "title": "Annotations",
+      "description": "Annotations for application resources",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service": {
+          "title": "Service Annotations",
+          "description": "Service annotation for application service",
+          "$ref": "#/definitions/labelAnnotationSchema"
+        },
+        "pod": {
+          "title": "Pod Annotations",
+          "description": "Pod annotation for application service",
+          "$ref": "#/definitions/labelAnnotationSchema"
+        }
+      }
+    },
+    "labels": {
+      "title": "Labels",
+      "description": "Labels for application resources",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "service": {
+          "title": "Service Labels",
+          "description": "Service labels for application service",
+          "$ref": "#/definitions/labelAnnotationSchema"
+        },
+        "pod": {
+          "title": "Pod Labels",
+          "description": "Pod labels for application service",
+          "$ref": "#/definitions/labelAnnotationSchema"
+        }
+      }
+    },
+    "scaling": {
+      "type": "object",
+      "title": "Scaling Configuration",
+      "description": "Scaling configuration",
+      "additionalProperties": false,
+      "properties": {
+        "replicaCount": {
+          "type": "integer",
+          "title": "Replica Count",
+          "description": "Number of replicas"
+        },
+        "horizontalPodAutoScaler": {
+          "type": "object",
+          "title": "Horizontal Pod AutoScaler",
+          "description": "Horizontal pod auto scaler",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "title": "Enabled",
+              "description": "Enable horizontal pod auto scaler"
+            },
+            "minReplicas": {
+              "type": "integer",
+              "title": "Min Replicas",
+              "description": "Minimum number of replicas"
+            },
+            "maxReplicas": {
+              "type": "integer",
+              "title": "Max Replicas",
+              "description": "Maximum number of replicas"
+            },
+            "targetCPUUtilizationPercentage": {
+              "type": "integer",
+              "title": "Target CPU Utilization Percentage",
+              "description": "Target cpu utilization percentage"
+            },
+            "targetMemoryUtilizationPercentage": {
+              "type": "integer",
+              "title": "Target Memory Utilization Percentage",
+              "description": "Target memory utilization percentage"
+            }
+          },
+          "required": [
+            "enabled",
+            "minReplicas",
+            "maxReplicas",
+            "targetCPUUtilizationPercentage",
+            "targetMemoryUtilizationPercentage"
+          ]
+        }
+      },
+      "required": [
+        "replicaCount",
+        "horizontalPodAutoScaler"
+      ]
+    },
+    "volumes": {
+      "type": "object",
+      "title": "Volumes Configuration",
+      "description": "Volumes configuration",
+      "properties": {
+        "data": {
+          "title": "Data Volume",
+          "description": "Data volume",
+          "$ref": "#/definitions/volumeDefinition"
+        },
+        "customPVCs": {
+          "title": "Custom Core PVCs",
+          "description": "Optional additional Core PVCs for customer applications",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "title": "Name",
+                "description": "Name suffix of the PVC - must be unique in the array",
+                "type": "string"
+              },
+              "accessModes": {
+                "title": "Access Modes",
+                "description": "PVC access modes - list of modes each of which must be one of ReadWriteOnce, ReadOnlyMany, ReadWriteMany",
+                "type": [
+                  "array"
+                ],
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "ReadWriteOnce",
+                    "ReadOnlyMany",
+                    "ReadWriteMany"
+                  ]
+                }
+              },
+              "mountPath": {
+                "title": "Mount Path",
+                "description": "Path in the core container where the volume will be mounted",
+                "type": "string"
+              },
+              "storageClassName": {
+                "title": "Storage Class Name",
+                "description": "The StorageClassName of the persistent volume that should be used to fulfill the Persistent Volume Claim.",
+                "type": "string"
+              },
+              "requests": {
+                "title": "Requests",
+                "description": "The persistent volume requests",
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "storage": {
+                    "title": "Storage",
+                    "description": "The storage request for the persistent volume claim",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "storage"
+                ]
+              },
+              "selector": {
+                "title": "Label selector",
+                "description": "Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.",
+                "$ref": "#/definitions/persistentVolumeClaimSelectorSchema"
+              },
+              "volumeName": {
+                "title": "Volume Name",
+                "description": "Optional volume name that can be set to map a specific existing volume.",
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "accessModes",
+              "mountPath",
+              "storageClassName",
+              "requests"
+            ]
+          }
+        }
+      },
+      "required": [
+        "data",
+        "customPVCs"
+      ]
+    },
+    "probes": {
+      "type": "object",
+      "title": "Probes Configuration",
+      "description": "Probes configuration",
+      "properties": {
+        "livenessProbe": {
+          "title": "Liveness Probe",
+          "description": "Liveness probe",
+          "$ref": "#/definitions/probeSchema"
+        },
+        "readinessProbe": {
+          "title": "Readiness Probe",
+          "description": "Readiness probe",
+          "$ref": "#/definitions/probeSchema"
+        }
+      },
+      "required": [
+        "livenessProbe",
+        "readinessProbe"
+      ]
+    }
+  },
+  "required": [
+    "global",
+    "image",
+    "containerPorts",
+    "service",
+    "extraEnvVars",
+    "resources",
+    "scaling",
+    "volumes",
+    "probes",
+    "configuration",
+    "ldap",
+    "externalDatabase"
+  ],
+  "definitions": {
+    "imageSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pullPolicy": {
+          "title": "Pull Policy",
+          "description": "Image pull policy",
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        },
+        "imagePullSecrets": {
+          "title": "Image Pull Secrets",
+          "description": "Image pull secrets",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "registry": {
+          "title": "Registry",
+          "description": "Image registry",
+          "type": "string"
+        },
+        "repository": {
+          "title": "Repository",
+          "description": "Image repository",
+          "type": "string"
+        },
+        "tag": {
+          "title": "Tag",
+          "description": "Image tag",
+          "type": "string"
+        }
+      }
+    },
+    "applicationConfigurationSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "production": {
+          "type": "boolean",
+          "title": "Production",
+          "description": "Production environment",
+          "default": false
+        },
+        "serviceAccountName": {
+          "type": "string",
+          "title": "Service Account Name",
+          "description": "Service account name"
+        },
+        "authStrategy": {
+          "title": "Authentication Strategy",
+          "description": "authentication strategy",
+          "type": "string",
+          "enum": [
+            "OIDC",
+            "DX",
+            "none"
+          ]
+        },
+        "uniqueUserIdentifier": {
+          "title": "Unique User Identifier",
+          "description": "Unique user identifier",
+          "type": "string"
+        },
+        "integration": {
+          "title": "Integration Configuration",
+          "description": "Integration configuration",
+          "type": "object",
+          "properties": {
+            "dx": {
+              "title": "DX Integration",
+              "description": "DX integration",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "dx"
+          ]
+        },
+        "jwt": {
+          "title": "JWT Configuration",
+          "description": "JWT configuration",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tokenExpiration": {
+              "title": "JWT token expiration",
+              "description": "JWT token expiration",
+              "type": "integer"
+            },
+            "secret": {
+              "title": "JWT secret",
+              "description": "JWT secret",
+              "type": "string"
+            },
+            "existingSecret": {
+              "title": "Existing JWT Secret",
+              "description": "Existing JWT secret",
+              "type": "string"
+            },
+            "existingSecretJwtSecretKey": {
+              "title": "Existing JWT secret key",
+              "description": "Existing JWT secret key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "secret",
+            "tokenExpiration"
+          ]
+        },
+        "oidc": {
+          "title": "OIDC Authentication",
+          "description": "OIDC auth configuration",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "issuer": {
+              "title": "Issuer",
+              "description": "OIDC issuer",
+              "type": "string"
+            },
+            "clientId": {
+              "title": "Client ID",
+              "description": "OIDC client ID",
+              "type": "string"
+            },
+            "clientSecret": {
+              "title": "Client Secret",
+              "description": "OIDC client secret",
+              "type": "string"
+            },
+            "redirectURI": {
+              "title": "Redirect URI",
+              "description": "OIDC redirect URI",
+              "type": "string"
+            },
+            "scopes": {
+              "title": "Scopes",
+              "description": "OIDC scopes",
+              "type": "string"
+            },
+            "existingSecret": {
+              "title": "Existing secret",
+              "description": "Existing secret",
+              "type": "string"
+            },
+            "existingSecretClientSecretKey": {
+              "title": "Existing client secret key",
+              "description": "Existing client secret key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "issuer",
+            "clientId",
+            "clientSecret",
+            "redirectURI",
+            "scopes",
+            "existingSecret",
+            "existingSecretClientSecretKey"
+          ]
+        },
+        "dx": {
+          "title": "DX Authentication",
+          "description": "DX auth configuration",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sessionCookieName": {
+              "title": "Session Cookie Name",
+              "description": "DX session cookie name",
+              "type": "string"
+            },
+            "userValidationEndpoint": {
+              "title": "User Validation Endpoint",
+              "description": "DX user validation endpoint",
+              "type": "string"
+            },
+            "currentUserAccessEndpoint": {
+              "title": "Current User Access Endpoint",
+              "description": "DX current user access endpoint",
+              "type": "string"
+            },
+            "userAccessPrivilegedRoles": {
+              "title": "User Access Privileged Roles",
+              "description": "DX user access privileged roles",
+              "type": "string"
+            },
+            "cacheTTL": {
+              "title": "Cache TTL",
+              "description": "DX user access cache TTL",
+              "type": "integer"
+            },
+            "cacheMaxEntries": {
+              "title": "Cache Max Entries",
+              "description": "DX user access cache max entries",
+              "type": "integer"
+            },
+            "portletPageContextRoot": {
+              "type": "string",
+              "title": "Portlet Page Context Root",
+              "description": "Portlet page context root"
+            }
+          },
+          "required": [
+            "sessionCookieName",
+            "userValidationEndpoint",
+            "currentUserAccessEndpoint",
+            "userAccessPrivilegedRoles",
+            "cacheTTL",
+            "cacheMaxEntries"
+          ]
+        },
+        "schema": {
+          "title": "Schema Configuration",
+          "description": "Schema configuration",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "readonlyFields": {
+              "title": "Read only Fields",
+              "description": "List of profile read only fields",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "customFields": {
+              "title": "Custom Fields",
+              "description": "List of custom fields that need to be created while deployment",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+          ]
+        },
+        "search": {
+          "title": "Search Configuration",
+          "description": "Search configuration",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "middleware": {
+              "title": "Search Middleware",
+              "description": "Search Middleware",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "title": "Enable or disable Search Middleware for indexing",
+                  "description": "Determines if search middleware is enabled or not",
+                  "type": "boolean"
+                },
+                "host": {
+                  "title": "Host",
+                  "description": "Host of Search Middleware",
+                  "type": "string"
+                },
+                "port": {
+                  "title": "Port",
+                  "description": "Port of Search Middleware",
+                  "type": [
+                    "null",
+                    "integer",
+                    "string"
+                  ]
+                },
+                "ssl": {
+                  "title": "SSL",
+                  "description": "SSL setting of Search Middleware",
+                  "type": "boolean"
+                },
+                "pushAdminUser": {
+                  "title": "Push Administrator Username",
+                  "description": "Push Administrator Username",
+                  "type": "string"
+                },
+                "pushAdminPassword": {
+                  "title": "Push Administrator Password",
+                  "description": "Push Administrator Password",
+                  "type": "string"
+                },
+                "existingPushAdminSecret": {
+                  "title": "Push Admin Existing Secret",
+                  "description": "Provide existing secret that will be used to set credentials for push administration.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "enabled",
+                "host",
+                "ssl",
+                "pushAdminUser",
+                "pushAdminPassword"
+              ]
+            },
+            "contentSourceId": {
+              "title": "Content Source ID in Search",
+              "description": "Content Source id in Search that will be used to index content",
+              "type": "string"
+            }
+          },
+          "required": [
+            "middleware",
+            "contentSourceId"
+          ]
+        }
+      },
+      "required": [
+        "production",
+        "authStrategy",
+        "jwt"
+      ]
+    },
+    "ldapSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "description": "Enable LDAP",
+          "type": "boolean"
+        },
+        "host": {
+          "title": "LDAP Host URL",
+          "description": "LDAP host URL",
+          "type": "string"
+        },
+        "bindDn": {
+          "title": "LDAP bind DN",
+          "description": "LDAP bind DN",
+          "type": "string"
+        },
+        "bindPassword": {
+          "title": "LDAP bind Password",
+          "description": "LDAP bind password",
+          "type": "string"
+        },
+        "searchBase": {
+          "title": "LDAP Search Base",
+          "description": "LDAP search base",
+          "type": "string"
+        },
+        "searchFilterAllUsers": {
+          "title": "Search Filter All Users",
+          "description": "LDAP search filter for all users",
+          "type": "string"
+        },
+        "searchFilterUser": {
+          "title": "Search Filter User",
+          "description": "LDAP search filter for user",
+          "type": "string"
+        },
+        "searchScope": {
+          "title": "Search Scope",
+          "description": "LDAP search scope",
+          "type": "string"
+        },
+        "searchAttributes": {
+          "title": "Search Attribute",
+          "description": "LDAP search attributes",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "userImageAttribute": {
+          "title": "User Image Attribute",
+          "description": "LDAP user image attribute",
+          "type": "string"
+        },
+        "attributeMapping": {
+          "title": "Attribute Mapping",
+          "description": "LDAP attribute mapping",
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "guid": {
+              "title": "GUID",
+              "description": "LDAP GUID",
+              "type": "string"
+            }
+          },
+          "required": [
+            "guid"
+          ]
+        },
+        "existingSecret": {
+          "title": "Existing secret",
+          "description": "LDAP existing secret",
+          "type": "string"
+        },
+        "existingSecretBindPasswordKey": {
+          "title": "Existing Bind Password Key",
+          "description": "LDAP existing bind password key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "host",
+        "bindDn",
+        "bindPassword",
+        "searchBase",
+        "searchFilterAllUsers",
+        "searchFilterUser",
+        "searchScope",
+        "searchAttributes",
+        "userImageAttribute",
+        "attributeMapping",
+        "existingSecret",
+        "existingSecretBindPasswordKey"
+      ]
+    },
+    "resourceRequestsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "title": "CPU",
+          "description": "Amount of CPU",
+          "type": "string"
+        },
+        "memory": {
+          "title": "Memory",
+          "description": "Amount of Memory",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cpu",
+        "memory"
+      ]
+    },
+    "resourceLimitsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": {
+          "title": "CPU",
+          "description": "Amount of CPU",
+          "type": ["string", "null"]
+        },
+        "memory": {
+          "title": "Memory",
+          "description": "Amount of Memory",
+          "type": ["string", "null"]
+        }
+      },
+      "required": [
+        "cpu",
+        "memory"
+      ]
+    },
+    "labelAnnotationSchema": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "additionalProperties": false,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "persistentVolumeClaimSelectorSchema": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "matchLabels": {
+          "title": "matchLabels",
+          "description": "The volume must have a label with this value",
+          "type": "object"
+        },
+        "matchExpressions": {
+          "title": "matchExpressions",
+          "description": "A list of requirements made by specifying key, list of values, and operator that relates the key and values. Valid operators include In, NotIn, Exists, and DoesNotExist.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "values": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "In",
+                  "NotIn",
+                  "Exists",
+                  "DoesNotExist"
+                ]
+              }
+            },
+            "required": [
+              "key",
+              "operator"
+            ]
+          }
+        }
+      }
+    },
+    "volumeDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "storageClassName": {
+          "title": "Storage Class Name",
+          "description": "The StorageClassName of the persistent volume that should be used to fulfill the Persistent Volume Claim.",
+          "type": "string"
+        },
+        "requests": {
+          "title": "Requests",
+          "description": "The persistent volume requests",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "storage": {
+              "title": "Storage",
+              "description": "The storage request for the persistent volume claim",
+              "type": "string"
+            }
+          },
+          "required": [
+            "storage"
+          ]
+        },
+        "selector": {
+          "title": "Label selector",
+          "description": "Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.",
+          "$ref": "#/definitions/persistentVolumeClaimSelectorSchema"
+        },
+        "volumeName": {
+          "title": "Volume Name",
+          "description": "Optional volume name that can be set to map a specific existing volume.",
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "storageClassName",
+        "requests"
+      ]
+    },
+    "probeSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enable Probe",
+          "description": "Enable probe",
+          "type": "boolean"
+        },
+        "initialDelaySeconds": {
+          "title": "Initial Delay Seconds",
+          "description": "Initial delay before probing",
+          "type": "integer"
+        },
+        "periodSeconds": {
+          "title": "Period Seconds",
+          "description": "Period between probes",
+          "type": "integer"
+        },
+        "timeoutSeconds": {
+          "title": "Timeout Seconds",
+          "description": "Timeout for probe",
+          "type": "integer"
+        },
+        "successThreshold": {
+          "title": "Success Threshold",
+          "description": "Number of successful probes",
+          "type": "integer"
+        },
+        "failureThreshold": {
+          "title": "Failure Threshold",
+          "description": "Number of failed probes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "initialDelaySeconds",
+        "periodSeconds",
+        "timeoutSeconds",
+        "successThreshold",
+        "failureThreshold"
+      ]
+    }
+  }
+}

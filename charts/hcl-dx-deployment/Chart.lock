@@ -1,0 +1,6 @@
+dependencies:
+- name: hcl-people-service
+  repository: file://../hcl-people-service
+  version: 1.0.0
+digest: sha256:ddf6a160596036ad268940e6de2b0baa07673cb44326843a844ca9a1dbd0fe0f
+generated: "2024-11-19T15:42:26.506773+05:30"

@@ -1,0 +1,33 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Role Binding
+# For Service: runtime-controller
+
+{{- if eq (include "hcl-dx-deployment.runtimeControllerEnabled" .) "true" }}
+
+apiVersion: "rbac.authorization.k8s.io/v1"
+kind: "RoleBinding"
+metadata:
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+  name: "{{ .Release.Name }}-runtime-controller-{{ .Release.Namespace }}"
+roleRef:
+  apiGroup: "rbac.authorization.k8s.io"
+  kind: "Role"
+  name: "{{ .Release.Name }}-runtime-controller-{{ .Release.Namespace }}"
+subjects:
+- kind: "ServiceAccount"
+  name: "{{ .Release.Name }}-runtime-controller-{{ .Release.Namespace }}"
+  namespace: "{{ .Release.Namespace }}"
+
+{{- end }}

@@ -1,0 +1,40 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: PersistentVolumeClaim
+# For Service: People Service
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hcl-people-service.pvcName" . }}
+  annotations:
+  {{- if (.Values.annotations.pod) }}
+  {{- range $customAnnotationValue := .Values.annotations.pod }}
+    {{ $customAnnotationValue.key }}: {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}  
+  labels:
+    app: {{ include "hcl-people-service.fullname" . }}
+    {{- include "hcl-people-service.labels" . | nindent 4 }}
+spec:
+  accessModes: 
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.volumes.data.requests.storage }}
+  storageClassName: {{ .Values.volumes.data.storageClassName }}
+  {{ if .Values.volumes.data.selector }}
+  selector: {{- toYaml (.Values.volumes.data.selector) | nindent 4 }}
+  {{ end }}
+  {{ if .Values.volumes.data.volumeName }} 
+  volumeName: {{ .Values.volumes.data.volumeName }}
+  {{ end }}

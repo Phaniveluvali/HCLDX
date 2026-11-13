@@ -1,0 +1,187 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2024. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Deployment incl. Pods
+# For Service: Content Composer
+
+{{- if eq (include "hcl-dx-deployment.contentComposerEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "{{ .Release.Name }}-content-composer"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  {{- if (.Values.scaling) }}
+  {{- if (.Values.scaling.replicas) }}  
+  replicas: {{ .Values.scaling.replicas.contentComposer }}
+  {{- end }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-content-composer"
+  template:
+    metadata:
+      annotations:
+      {{- if (.Values.annotations.pod.contentComposer) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.contentComposer }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config-content-composer: "{{- include "hcl-dx-deployment.contentComposerConfig" . | sha256sum }}"
+        {{- if and (.Values.metrics.contentComposer.scrape) (eq (.Values.metrics.contentComposer.prometheusDiscoveryType) "annotation")}}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/probe/metrics"
+        prometheus.io/port: "{{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}"
+        {{- end }}
+      labels:
+      {{- if (.Values.labels.pod.contentComposer) }}
+      {{- range $customLabelValue := .Values.labels.pod.contentComposer }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-content-composer"
+            # Using general labels, see _deployment_helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.contentComposer)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.contentComposer) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.contentComposer)}}
+      affinity:
+        {{- toYaml (.Values.affinity.contentComposer) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.contentComposer)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.contentComposer) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.contentComposer)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.contentComposer) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.contentComposer)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.contentComposer) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.contentComposer)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.contentComposer) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: "content-composer"
+          # Build the image attribute by using the repository and image tag
+          {{- if (.Values.images.tags) }}
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.contentComposer }}:{{ .Values.images.tags.contentComposer }}"
+          {{- end }}
+          # Adjust the image pull policy based on the CHart value
+          {{- if (.Values.images) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          {{- end }}
+          env:
+          {{- if (.Values.environment.pod.contentComposer) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.contentComposer }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.contentComposer | quote }} 
+          # Port exposure configuration
+          ports:
+            - name: "composer"
+              containerPort: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.contentComposer) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/probe/live"
+              port: 3000
+              scheme: "HTTP"
+          {{- end }}
+          {{- with .Values.probes.contentComposer.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.contentComposer) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/probe/ready"
+              port: 3000
+              scheme: "HTTP"
+          {{- with .Values.probes.contentComposer.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if and (.Values.resources) (.Values.resources.contentComposer) }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.contentComposer.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.contentComposer.requests.cpu }}"
+              memory: "{{ .Values.resources.contentComposer.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.contentComposer.limits) }}
+            limits:
+              {{- if (.Values.resources.contentComposer.limits.cpu) }}
+              cpu: "{{ .Values.resources.contentComposer.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.contentComposer.limits.memory) }}
+              memory: "{{ .Values.resources.contentComposer.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+      volumes:
+        - name: "config"
+          configMap:
+            name: "{{ .Release.Name }}-content-composer"
+        - name: "global-config"
+          configMap:
+            name: "{{ .Release.Name }}-global"
+
+{{- end }}

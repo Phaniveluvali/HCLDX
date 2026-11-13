@@ -1,0 +1,44 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: Content Composer
+
+{{- if eq (include "hcl-dx-deployment.contentComposerEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-content-composer"
+  annotations: 
+  {{- if (.Values.annotations.service.contentComposer) }}
+  {{- range $customAnnotationValue := .Values.annotations.service.contentComposer }}
+    {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  labels:
+    app: "{{ .Release.Name }}-content-composer"
+  {{- if (.Values.labels.service.contentComposer) }}
+  {{- range $customLabelValue := .Values.labels.service.contentComposer }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+  {{- end }}
+  {{- end }}
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  type: "ClusterIP"
+  ports:
+    - name: "content-composer"
+      port: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+  selector:
+    app: "{{ .Release.Name }}-content-composer"
+
+{{- end }}

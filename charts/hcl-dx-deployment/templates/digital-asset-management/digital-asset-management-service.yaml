@@ -1,0 +1,44 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: Digital Asset Management
+
+{{- if eq (include "hcl-dx-deployment.digitalAssetManagementEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-digital-asset-management"
+  annotations: 
+  {{- if (.Values.annotations.service.digitalAssetManagement) }}
+  {{- range $customAnnotationValue := .Values.annotations.service.digitalAssetManagement }}
+    {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  labels:
+    app: "{{ .Release.Name }}-digital-asset-management"
+  {{- if (.Values.labels.service.digitalAssetManagement) }}
+  {{- range $customLabelValue := .Values.labels.service.digitalAssetManagement }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+  {{- end }}
+  {{- end }}
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  type: "ClusterIP"
+  ports:
+    - name: "digital-asset-management"
+      port: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+  selector:
+    app: "{{ .Release.Name }}-digital-asset-management"
+
+{{- end }}

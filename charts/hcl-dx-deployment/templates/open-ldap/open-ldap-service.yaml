@@ -1,0 +1,48 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: open-ldap
+
+{{- if eq (include "hcl-dx-deployment.openLdapEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-open-ldap"
+  annotations: 
+  {{- if (.Values.annotations.service.openLdap) }}
+  {{- range $customAnnotationValue := .Values.annotations.service.openLdap }}
+    {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  labels:
+    app: "{{ .Release.Name }}-open-ldap"
+  {{- if (.Values.labels.service.openLdap) }}
+  {{- range $customLabelValue := .Values.labels.service.openLdap }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+  {{- end }}
+  {{- end }}
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  type: "ClusterIP"
+  ports:
+    - name: "openldap-ldap"
+      port: {{ include "hcl-dx-deployment.ports.openldap.ldap" . }}
+    - name: "openldap-ldaps"
+      port: {{ include "hcl-dx-deployment.ports.openldap.ldaps" . }}
+    - name: "openldap-ldapi"
+      port: {{ include "hcl-dx-deployment.ports.openldap.ldapi" . }}
+  selector:
+    app: "{{ .Release.Name }}-open-ldap"
+
+{{- end }}

@@ -1,0 +1,33 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 202. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: ServiceMonitor
+# For Service: WebEngine
+
+{{- if and (eq (include "hcl-dx-deployment.webEngineEnabled" .) "true") (.Values.metrics.webEngine.scrape) (eq (.Values.metrics.webEngine.prometheusDiscoveryType) "serviceMonitor")}}
+
+apiVersion: "monitoring.coreos.com/v1"
+kind: "ServiceMonitor"
+metadata:
+  name: "{{ .Release.Name }}-web-engine"
+  labels:
+    app: "{{ .Release.Name }}-web-engine"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-web-engine"
+  endpoints:
+    - targetPort: {{ include "hcl-dx-deployment.ports.webEngine.metrics" . }}
+      path: /metrics
+
+{{- end }}

@@ -1,0 +1,16 @@
+{{- if .Values.global }}
+{{- if .Values.global.sofySolutionContext }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: dx
+  labels:
+{{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+  selector:
+{{- include "hcl-dx-deployment.selectorLabels" . | nindent 4 }} 
+{{- end}}
+{{- end}}

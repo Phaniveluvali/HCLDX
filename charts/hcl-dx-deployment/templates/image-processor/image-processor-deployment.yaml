@@ -1,0 +1,195 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2024. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Deployment incl. Pods
+# For Service: image-processor
+
+{{- if eq (include "hcl-dx-deployment.imageProcessorEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "{{ .Release.Name }}-image-processor"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  {{- if (.Values.scaling) }}
+  {{- if (.Values.scaling.replicas) }}
+  replicas: {{ .Values.scaling.replicas.imageProcessor }}
+  {{- end }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-image-processor"
+  template:
+    metadata:
+      annotations: 
+      {{- if (.Values.annotations.pod.imageProcessor) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.imageProcessor }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config-image-processor: "{{- include "hcl-dx-deployment.imageProcessorConfig" . | sha256sum }}"
+        checksum/auth-secret-image-processor: {{ .Values.security.imageProcessor.authenticationKey | sha256sum }}
+        {{- if and (.Values.metrics.imageProcessor.scrape) (eq (.Values.metrics.imageProcessor.prometheusDiscoveryType) "annotation") }}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/probe/metrics"
+        prometheus.io/port: "{{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}"
+        {{- end }}
+      labels:
+      {{- if (.Values.labels.pod.imageProcessor) }}
+      {{- range $customLabelValue := .Values.labels.pod.imageProcessor }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-image-processor"
+        # Using general labels, see _helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.imageProcessor)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.imageProcessor) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.imageProcessor)}}
+      affinity:
+        {{- toYaml (.Values.affinity.imageProcessor) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.imageProcessor)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.imageProcessor) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.imageProcessor)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.imageProcessor) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.imageProcessor)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.imageProcessor) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.imageProcessor)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.imageProcessor) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: "image-processor"
+          # Build the image attribute by using the repository and image tag
+          {{- if (.Values.images.tags) }}
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.imageProcessor }}:{{ .Values.images.tags.imageProcessor }}"
+          {{- end }}
+          # Adjust the image pull policy based on the CHart value
+          {{- if (.Values.images) }}
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          {{- end }}
+          env:
+          {{- if (.Values.environment.pod.imageProcessor) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.imageProcessor }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "PORT_v1"
+              value: "{{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}"
+            - name: "PLUGIN_API_AUTH_KEY"
+              valueFrom:
+                secretKeyRef:
+                  key: "authenticationKey"
+                  name: "{{ .Release.Name }}-image-processor-authentication"
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.imageProcessor | quote }} 
+          # Port exposure configuration
+          ports:
+            - name: "image-processor"
+              containerPort: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.imageProcessor) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/probe/live"
+              port: 3000
+              scheme: "HTTP"
+          {{- with .Values.probes.imageProcessor.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.imageProcessor) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/probe/ready"
+              port: 3000
+              scheme: "HTTP"
+          {{- with .Values.probes.imageProcessor.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if and (.Values.resources) (.Values.resources.imageProcessor) }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.imageProcessor.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.imageProcessor.requests.cpu }}"
+              memory: "{{ .Values.resources.imageProcessor.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.imageProcessor.limits) }}
+            limits:
+              {{- if (.Values.resources.imageProcessor.limits.cpu) }}
+              cpu: "{{ .Values.resources.imageProcessor.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.imageProcessor.limits.memory) }}
+              memory: "{{ .Values.resources.imageProcessor.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+      volumes:
+        - name: "config"
+          configMap:
+            name: "{{ .Release.Name }}-image-processor"
+        - name: "global-config"
+          configMap:
+            name: "{{ .Release.Name }}-global"
+
+{{- end }}

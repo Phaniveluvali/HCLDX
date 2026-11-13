@@ -1,0 +1,32 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: Core
+
+{{- if eq (include "hcl-dx-deployment.coreEnabled" .) "true" }}
+{{- if eq (include "hcl-dx-deployment.configureRemoteSearch" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-core-unready-headless"
+spec:
+  type: "ClusterIP"
+  clusterIP: "None"
+  ports:
+    {{- include "hcl-dx-deployment.corePortList" . | nindent 4 }}
+  publishNotReadyAddresses: true
+  selector:
+    app: "{{ .Release.Name }}-core"
+
+{{- end }}
+{{- end }}

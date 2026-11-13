@@ -1,0 +1,33 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: ServiceMonitor
+# For Service: DAM Kaltura Plugin
+
+{{- if and (eq (include "hcl-dx-deployment.damPluginKalturaEnabled" .) "true") (.Values.metrics.damPluginKaltura.scrape) (eq (.Values.metrics.damPluginKaltura.prometheusDiscoveryType) "serviceMonitor")}}
+
+apiVersion: "monitoring.coreos.com/v1"
+kind: "ServiceMonitor"
+metadata:
+  name: "{{ .Release.Name }}-dam-plugin-kaltura"
+  labels:
+    app: "{{ .Release.Name }}-dam-plugin-kaltura"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-dam-plugin-kaltura"
+  endpoints:
+    - targetPort: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+      path: /probe/metrics
+
+{{- end }}

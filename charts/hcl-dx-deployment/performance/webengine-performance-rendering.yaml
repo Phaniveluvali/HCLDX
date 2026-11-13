@@ -1,0 +1,83 @@
+configuration:
+  webEngine:
+    configOverrideFiles:
+      ldapCacheOverride.xml: |
+        <server description="DX Web Engine server">
+           <ldapRegistry id="ldap">
+               <ldapCache>
+                  <attributesCache size="10000" sizeLimit="10000" timeout="3600s" />
+                  <searchResultsCache resultsSizeLimit="10000" size="10000" timeout="3600s" />
+              </ldapCache>
+           </ldapRegistry>
+        </server>
+      WCMDynacachesPerformance.xml: |
+        <server description="DX Web Engine server">
+              <distributedMap id="services/cache/iwk/abspath" memorySizeInEntries="32000"></distributedMap>
+              <distributedMap id="services/cache/iwk/abspathreverse" memorySizeInEntries="32000"></distributedMap>
+              <distributedMap id="services/cache/iwk/processing" memorySizeInEntries="10000"></distributedMap>
+              <distributedMap id="services/cache/iwk/session" memorySizeInEntries="6000"></distributedMap>
+              <distributedMap id="services/cache/iwk/strategy" memorySizeInEntries="32000"></distributedMap>
+              <distributedMap id="services/cache/iwk/summary" memorySizeInEntries="4000"></distributedMap>
+              <distributedMap id="services/cache/iwk/principalinformation" memorySizeInEntries="4000"></distributedMap>
+        </server>
+    propertiesFilesOverrides:
+      WCMConfigService.properties:
+        connect.moduleconfig.ajpe.contentcache.defaultcontentcache: "SECURED"
+        connect.moduleconfig.ajpe.contentcache.contentcacheexpires: "REL 2H"
+        user.cache.enable: "true"
+        versioningStrategy.Default: "manual"
+        versioningStrategy.AuthoringTemplate: "manual"
+        versioningStrategy.Component: "manual"
+        versioningStrategy.Content: "manual"
+        versioningStrategy.PresentationTemplate: "manual"
+        versioningStrategy.SiteArea: "manual"
+        versioningStrategy.PortalPage: "manual"
+        versioningStrategy.Taxonomy: "manual"
+        versioningStrategy.Workflow: "manual"
+        deployment.subscriberOnly: "true"
+      CacheManagerService.properties:
+        cacheinstance.com.ibm.wps.ac.AccessControlUserContextCache.size: "8403"
+        cacheinstance.com.ibm.wps.model.factory.UserSpecificModelCache.size: "8403"
+        cacheinstance.com.ibm.wps.ac.ProtectedResourceCache.lifetime: "28800"
+        cacheinstance.com.ibm.wps.ac.AccessControlUserContextCache.lifetime: "2400"
+        cacheinstance.com.ibm.wps.ac.groupmanagement.NestedGroupCache.lifetime: "7200"
+        cacheinstance.com.ibm.wps.pe.portletentitycounter.lifetime: "3600"
+        cacheinstance.com.ibm.wps.puma.CommonPrincipalCache.lifetime: "7200"
+        cacheinstance.com.ibm.wps.ac.ExplicitEntitlementsCache.ICM_CONTENT.lifetime: "18280"
+        cacheinstance.com.ibm.wps.ac.ExplicitEntitlementsCache.ICM_CONTENT.size: "80000"
+        cacheinstance.com.ibm.wps.resolver.friendly.cache.size: "9000"
+        cacheinstance.com.ibm.wps.ac.groupmanagement.NestedGroupCache.size: "6000"
+      ConfigService.properties:
+        timeout.resume.session: "true"
+        persistent.session.level: "0"
+        record.lastlogin: "false"
+        content.topology.dynamic: "false"
+        friendly.enabled: "true"
+        friendly.pathinfo.enabled: "true"
+        cache.dynamic.content.spot: "false"
+        resourceaggregation.cache.markup: "true"
+        resourceaggregation.enableRuntimePortletCapabilitiesFilter: "false"
+      PumaStoreService.properties:
+        store.puma_default.disableACforRead: "true"
+      CPConfigurationService.properties:
+        com.ibm.wps.cp.tagging.isTaggingEnabled: "false"
+        com.ibm.wps.cp.rating.isRatingEnabled: "false"
+      CommonComponentConfigService.properties:
+        cc.multipart.enabled: "false"
+        cc.multipart.correlatehosts: "false"
+      NavigatorService.properties:
+        public.expires: "3600"
+        public.reload: "3600"
+        remote.cache.expiration: "28800"
+      RegistryService.properties:
+        default.interval: "28800"
+        bucket.transformationapp: "28800"
+        bucket.transformation.int: "28800"
+      AccessControlDataManagementService.properties:
+        accessControlDataManagement.acucIgnoreResourceTypes: "null"
+        accessControlDataManagement.loadRolesParentBased: "false"
+environment:
+  pod:
+    webEngine:
+    - name: JVM_ARGS
+      value: "-Xmx4096m -Xms4096m -Xmn1024m -XX:MaxDirectMemorySize=256000000"

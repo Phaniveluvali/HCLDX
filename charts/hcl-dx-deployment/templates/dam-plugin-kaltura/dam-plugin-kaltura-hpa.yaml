@@ -1,0 +1,46 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: HorizontalPodAutoscaler
+# For Service: DAM kaltura Plugin
+
+{{- if eq (include "hcl-dx-deployment.damPluginKalturaEnabled" .) "true" }}
+{{- if .Values.scaling.horizontalPodAutoScaler.damPluginKaltura.enabled }}
+apiVersion: "autoscaling/v2"
+kind: "HorizontalPodAutoscaler"
+metadata:
+  name: "{{ .Release.Name }}-dam-plugin-kaltura"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: "apps/v1"
+    kind: "Deployment"
+    name: "{{ .Release.Name }}-dam-plugin-kaltura"
+  minReplicas: {{ .Values.scaling.horizontalPodAutoScaler.damPluginKaltura.minReplicas }}
+  maxReplicas: {{ .Values.scaling.horizontalPodAutoScaler.damPluginKaltura.maxReplicas }}
+  metrics:
+  - type: "Resource"
+    resource:
+      name: "memory"
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.scaling.horizontalPodAutoScaler.damPluginKaltura.targetMemoryUtilizationPercentage }}
+  - type: "Resource"
+    resource:
+      name: "cpu"
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.scaling.horizontalPodAutoScaler.damPluginKaltura.targetCPUUtilizationPercentage }}
+
+{{- end }}
+{{- end }}

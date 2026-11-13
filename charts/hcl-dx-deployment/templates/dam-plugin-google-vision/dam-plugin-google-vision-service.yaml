@@ -1,0 +1,44 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: dam-plugin-google-vision
+
+{{- if eq (include "hcl-dx-deployment.damPluginGoogleVisionEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-dam-plugin-google-vision"
+  annotations: 
+  {{- if (.Values.annotations.service.damPluginGoogleVision) }}
+  {{- range $customAnnotationValue := .Values.annotations.service.damPluginGoogleVision }}
+    {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  labels:
+    app: "{{ .Release.Name }}-dam-plugin-google-vision"
+  {{- if (.Values.labels.service.damPluginGoogleVision) }}
+  {{- range $customLabelValue := .Values.labels.service.damPluginGoogleVision }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+  {{- end }}
+  {{- end }}
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  type: "ClusterIP"
+  ports:
+    - name: "dam-plugin-google-vision"
+      port: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+  selector:
+    app: "{{ .Release.Name }}-dam-plugin-google-vision"
+
+{{- end }}

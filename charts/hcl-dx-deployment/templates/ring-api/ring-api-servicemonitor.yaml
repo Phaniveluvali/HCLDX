@@ -1,0 +1,33 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: ServiceMonitor
+# For Service: RingAPI
+
+{{- if and (eq (include "hcl-dx-deployment.ringApiEnabled" .) "true") (.Values.metrics.ringApi.scrape) (eq (.Values.metrics.ringApi.prometheusDiscoveryType) "serviceMonitor")}}
+
+apiVersion: "monitoring.coreos.com/v1"
+kind: "ServiceMonitor"
+metadata:
+  name: "{{ .Release.Name }}-ring-api"
+  labels:
+    app: "{{ .Release.Name }}-ring-api"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-ring-api"
+  endpoints:
+    - targetPort: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+      path: /probe/metrics
+
+{{- end }}

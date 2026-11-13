@@ -1,0 +1,77 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: "{{ .Release.Name }}-ingress"
+  labels:
+    app: "{{ .Release.Name }}-haproxy"
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/proxy-ssl-verify: "off"
+    nginx.ingress.kubernetes.io/proxy-body-size: "262M"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: "{{ .Values.networking.core.host }}"
+    http:
+      paths:
+      - path: /wps
+        pathType: Prefix
+        backend:
+          service:
+            name: "{{ .Release.Name }}-haproxy"
+            port:
+              number: {{ include "hcl-dx-deployment.haproxyServicePort" . }}
+      - path: /dx
+        pathType: Prefix
+        backend:
+          service:
+            name: "{{ .Release.Name }}-haproxy"
+            port:
+              number: {{ include "hcl-dx-deployment.haproxyServicePort" . }}
+      - path: /ibm
+        pathType: Prefix
+        backend:
+          service:
+            name: "{{ .Release.Name }}-haproxy"
+            port:
+              number: {{ include "hcl-dx-deployment.haproxyServicePort" . }}
+      - path: /myportal
+        pathType: Prefix
+        backend:
+          service:
+            name: "{{ .Release.Name }}-haproxy"
+            port:
+              number: {{ include "hcl-dx-deployment.haproxyServicePort" . }}
+      - path: /portal
+        pathType: Prefix
+        backend:
+          service:
+            name: "{{ .Release.Name }}-haproxy"
+            port:
+              number: {{ include "hcl-dx-deployment.haproxyServicePort" . }}
+      - path: /picker
+        pathType: Prefix
+        backend:
+          service:
+            name: "{{ .Release.Name }}-haproxy"
+            port:
+              number: {{ include "hcl-dx-deployment.haproxyServicePort" . }}
+  - host: "dx.{{ .Values.networking.core.host }}"
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: "{{ .Release.Name }}-haproxy"
+            port:
+              number: {{ include "hcl-dx-deployment.haproxyServicePort" . }}
+  tls:
+  - hosts:
+    - "{{ .Values.networking.core.host }}"
+    - "dx.{{ .Values.networking.core.host }}"
+    secretName: "{{ .Values.networking.tlsCertSecret }}"

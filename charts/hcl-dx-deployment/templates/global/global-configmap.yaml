@@ -1,0 +1,136 @@
+
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2025 All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: ConfigMap
+# For Service: All Services
+
+apiVersion: "v1"
+kind: "ConfigMap"
+metadata:
+  name: "{{ .Release.Name }}-global"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+data:
+# Log levels can be defined as arrays or strings (deprecated). We join to handle arrays. Strings will pass through this unchanged.
+  {{- range $key, $value := .Values.logging }}
+    {{- if (index $value "level") }}
+  "log.{{ $key }}": {{ join  ","  (index $value "level")| quote }}
+    {{- end -}}
+  {{- end }}
+  # OpenTelemetry configuration section - only included if OpenTelemetry is enabled
+    {{- if and .Values.incubator.openTelemetry .Values.incubator.openTelemetry.enabled }} # ============================================
+  # OpenTelemetry Configuration
+  # ============================================
+  # These variables are read by application startup scripts from /etc/global-config
+  # and exported as environment variables before application startup
+  
+  # ============================================
+  # Common OTel Configuration (applies to all services)
+  # ============================================
+  "otel.exporter.otlp.endpoint": {{ .Values.incubator.openTelemetry.collector.exportUrl | quote }}
+  "otel.exporter.otlp.protocol": {{ .Values.incubator.openTelemetry.collector.protocol | quote }}
+  "otel.traces.exporter": "otlp"
+  "otel.metrics.exporter": "otlp"
+  "otel.logs.exporter": "otlp"
+  
+  # ============================================
+  # OpenTelemetry SDK Log Levels (per-service)
+  # NOTE: These control ONLY OpenTelemetry SDK internal diagnostic logging
+  # Application logs are NOT affected by these settings
+  # ============================================
+  "otel.log.level.default": {{ .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  
+  # Core DX Services
+  "otel.log.level.core": {{ .Values.incubator.openTelemetry.logging.services.core | default .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  "otel.log.level.webengine": {{ .Values.incubator.openTelemetry.logging.services.webEngine | default .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  "otel.log.level.contentcomposer": {{ .Values.incubator.openTelemetry.logging.services.contentComposer | default .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  "otel.log.level.dam": {{ .Values.incubator.openTelemetry.logging.services.digitalAssetManagement | default .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  "otel.log.level.imageprocessor": {{ .Values.incubator.openTelemetry.logging.services.imageProcessor | default .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  "otel.log.level.licensemanager": {{ .Values.incubator.openTelemetry.logging.services.licenseManager | default .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  "otel.log.level.openldap": {{ .Values.incubator.openTelemetry.logging.services.openLdap | default .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  "otel.log.level.persistence": {{ .Values.incubator.openTelemetry.logging.services.persistence | default .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  "otel.log.level.remotesearch": {{ .Values.incubator.openTelemetry.logging.services.remoteSearch | default .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  "otel.log.level.ringapi": {{ .Values.incubator.openTelemetry.logging.services.ringApi | default .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  "otel.log.level.runtimecontroller": {{ .Values.incubator.openTelemetry.logging.services.runtimeController | default .Values.incubator.openTelemetry.logging.default | default "info" | quote }}
+  
+  # Debug configuration
+  "debug.otel.enabled": {{ .Values.incubator.openTelemetry.debug.enabled | quote }}
+  
+  # ============================================
+  # Deployment-Specific Service Name Base (without pod suffix)
+  # These are base names that will have the pod number appended by the startup script
+  # ============================================
+  {{- $serviceName := .Values.incubator.openTelemetry.service.name }}
+  {{- if eq $serviceName "" }}
+    {{- $serviceName = .Release.Name }}
+  {{- end }}
+  {{- $serviceNamespace := .Values.incubator.openTelemetry.service.namespace }}
+  {{- if eq $serviceNamespace "" }}
+    {{- $serviceNamespace = .Release.Namespace }}
+  {{- end }}
+  
+  # Core
+  "otel.service.name.base.core": "{{ $serviceName }}-core"
+  "otel.resource.attributes.core": "deployment.environment={{ $serviceNamespace }},service.version={{ .Values.images.tags.core }}"
+  
+  # Content Composer
+  "otel.service.name.base.contentcomposer": "{{ $serviceName }}-content-composer"
+  "otel.resource.attributes.contentcomposer": "deployment.environment={{ $serviceNamespace }},service.version={{ .Values.images.tags.contentComposer }}"
+    
+  # Digital Asset Management
+  "otel.service.name.base.dam": "{{ $serviceName }}-digital-asset-management"
+  "otel.resource.attributes.dam": "deployment.environment={{ $serviceNamespace }},service.version={{ .Values.images.tags.digitalAssetManagement }}"
+  
+  # Image Processor
+  "otel.service.name.base.imageprocessor": "{{ $serviceName }}-image-processor"
+  "otel.resource.attributes.imageprocessor": "deployment.environment={{ $serviceNamespace }},service.version={{ .Values.images.tags.imageProcessor }}"
+  
+  # License Manager
+  "otel.service.name.base.licensemanager": "{{ $serviceName }}-license-manager"
+  "otel.resource.attributes.licensemanager": "deployment.environment={{ $serviceNamespace }},service.version={{ .Values.images.tags.licenseManager }}"
+  
+  # OpenLDAP
+  "otel.service.name.base.openldap": "{{ $serviceName }}-openldap"
+  "otel.resource.attributes.openldap": "deployment.environment={{ $serviceNamespace }},service.version={{ .Values.images.tags.openLdap }}"
+  
+  # Persistence
+  "otel.service.name.base.persistence": "{{ $serviceName }}-persistence"
+  "otel.resource.attributes.persistence": "deployment.environment={{ $serviceNamespace }},service.version={{ .Values.images.tags.persistenceNode }}"
+  
+  # Remote Search
+  "otel.service.name.base.remotesearch": "{{ $serviceName }}-remote-search"
+  "otel.resource.attributes.remotesearch": "deployment.environment={{ $serviceNamespace }},service.version={{ .Values.images.tags.remoteSearch }}"
+  
+  # Ring API
+  "otel.service.name.base.ringapi": "{{ $serviceName }}-ring-api"
+  "otel.resource.attributes.ringapi": "deployment.environment={{ $serviceNamespace }},service.version={{ .Values.images.tags.ringApi }}"
+  
+  # Runtime Controller
+  "otel.service.name.base.runtimecontroller": "{{ $serviceName }}-runtime-controller"
+  "otel.resource.attributes.runtimecontroller": "deployment.environment={{ $serviceNamespace }},service.version={{ .Values.images.tags.runtimeController }}"
+
+  # Web Engine
+  "otel.service.name.base.webengine": "{{ $serviceName }}-web-engine"
+  "otel.resource.attributes.webengine": "deployment.environment={{ $serviceNamespace }},service.version={{ .Values.images.tags.webEngine }}"
+
+  
+  # ============================================
+  # Java-specific configuration
+  # ============================================
+  "otel.java.tool.options": "-javaagent:/opt/otel/opentelemetry-javaagent.jar"
+  
+  # ============================================
+  # Node.js-specific configuration
+  # ============================================
+  "otel.node.resource.detectors": "env,host,os"
+  {{- end }}

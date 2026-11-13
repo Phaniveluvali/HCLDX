@@ -1,0 +1,42 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: runtime-controller
+
+{{- if eq (include "hcl-dx-deployment.runtimeControllerEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-runtime-controller"
+  annotations: 
+  {{- if (.Values.annotations.service.runtimeController) }}
+  {{- range $customAnnotationValue := .Values.annotations.service.runtimeController }}
+    {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  labels:
+    app: "{{ .Release.Name }}-runtime-controller"
+  {{- if (.Values.labels.service.runtimeController) }}
+  {{- range $customLabelValue := .Values.labels.service.runtimeController }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+  {{- end }}
+  {{- end }}
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  type: "ClusterIP"
+  ports:
+    - name: "runtime-controller"
+      port: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+
+{{- end }}

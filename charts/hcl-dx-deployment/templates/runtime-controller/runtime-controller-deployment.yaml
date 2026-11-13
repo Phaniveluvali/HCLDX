@@ -1,0 +1,196 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2025. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Deployment incl. Pods
+# For Service: runtime-controller
+
+{{- if eq (include "hcl-dx-deployment.runtimeControllerEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "{{ .Release.Name }}-runtime-controller"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  {{- if (.Values.scaling) }}
+  {{- if (.Values.scaling.replicas) }}
+  replicas: {{ .Values.scaling.replicas.runtimeController }}
+  {{- end }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-runtime-controller"
+  template:
+    metadata:
+      annotations: 
+      {{- if (.Values.annotations.pod.runtimeController) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.runtimeController }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config: {{ include "hcl-dx-deployment.runtimeControllerConfig" . | sha256sum }}
+        hash/checksum: {{ .Values.images.tags.runtimeController | sha256sum | quote }}
+      labels:
+      {{- if (.Values.labels.pod.runtimeController) }}
+      {{- range $customLabelValue := .Values.labels.pod.runtimeController }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-runtime-controller"
+        # Using general labels, see _helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.runtimeController)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.runtimeController) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.runtimeController)}}
+      affinity:
+        {{- toYaml (.Values.affinity.runtimeController) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.runtimeController)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.runtimeController) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.runtimeController)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.runtimeController) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.runtimeController)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.runtimeController) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.runtimeController)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.runtimeController) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      serviceAccount: "{{ .Release.Name }}-runtime-controller-{{ .Release.Namespace }}"
+      serviceAccountName: "{{ .Release.Name }}-runtime-controller-{{ .Release.Namespace }}"
+      containers:
+        - name: "runtime-controller"
+          # Build the image attribute by using the repository and image tag
+          {{- if (.Values.images.tags) }}
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.runtimeController }}:{{ .Values.images.tags.runtimeController }}"
+          {{- end }}
+          # Adjust the image pull policy based on the CHart value
+          {{- if (.Values.images) }}
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          {{- end }}
+          env:
+          {{- if (.Values.environment.pod.runtimeController) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.runtimeController }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "NAMESPACE"
+              valueFrom:
+                fieldRef:
+                  fieldPath: "metadata.namespace"
+            - name: "RELEASE"
+              value: "{{ .Release.Name }}"
+            - name: "IQ_CUSTOM_DB_SECRET"
+              value: {{ .Values.incubator.security.iq.customDbSecret | default "" | quote }}
+            - name: "IQ_ENABLED"
+              value: {{ include "hcl-dx-deployment.iqEnabled" . | quote }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.runtimeController | quote }} 
+            # Environment variable for new DB management mode
+            - name: "NEW_DB_MANAGEMENT"
+              value: {{ .Values.configuration.digitalAssetManagement.newDbManagement | quote }}
+            - name: IMAGE_HASH
+              value: {{ .Values.images.tags.runtimeController | sha256sum | quote }}
+          # Port exposure configuration
+          ports:
+            - name: "rc"
+              containerPort: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.runtimeController) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/q/health/live"
+              port: 3000
+              scheme: "HTTP"
+          {{- with .Values.probes.runtimeController.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.runtimeController) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/q/health/ready"
+              port: 3000
+              scheme: "HTTP"
+          {{- with .Values.probes.runtimeController.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if and (.Values.resources) (.Values.resources.runtimeController) }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.runtimeController.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.runtimeController.requests.cpu }}"
+              memory: "{{ .Values.resources.runtimeController.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.runtimeController.limits) }}
+            limits:
+              {{- if (.Values.resources.runtimeController.limits.cpu) }}
+              cpu: "{{ .Values.resources.runtimeController.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.runtimeController.limits.memory) }}
+              memory: "{{ .Values.resources.runtimeController.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+      volumes:
+        - name: "config"
+          configMap:
+            name: "{{ .Release.Name }}-runtime-controller"
+        - name: "global-config"
+          configMap:
+            name: "{{ .Release.Name }}-global"
+
+{{- end }}

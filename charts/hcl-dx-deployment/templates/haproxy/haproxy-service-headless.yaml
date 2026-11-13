@@ -1,0 +1,33 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+{{- if eq (include "hcl-dx-deployment.haproxyEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  annotations:
+  name: "{{ .Release.Name }}-haproxy-headless"
+  labels:
+    app: "{{ .Release.Name }}-haproxy-headless"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  # We want to publish the Pod addresses as soon as possible as HAProxy uses them to resolve the peers
+  publishNotReadyAddresses: true
+  type: "ClusterIP"
+  clusterIP: "None"
+  ports:
+    - name: "haproxy"
+      port: {{ include "hcl-dx-deployment.ports.haproxy.serverContainerPort" . }}
+  selector:
+    app: "{{ .Release.Name }}-haproxy"
+
+{{- end }}

@@ -1,0 +1,47 @@
+configuration:
+  webEngine:
+    configOverrideFiles:
+      oidc.xml: |
+        <server description="DX Web Engine server">
+            <!-- Authentication filter to exclude XMLAccess and Search v2 endpoints from OIDC authentication.
+            This is required to prevent XMLAccess configuration scripts and Search v2 from being redirected to the OIDC provider.
+            NOTE: Update the urlPattern based on your context root. The context root is configured in your Helm values. -->
+            <authFilter id="oidcAuthFilter">
+                <requestUrl id="excludeXMLAccess" urlPattern="/wps/config" matchType="notContain"/>
+                <requestUrl id="excludeSeedlist" urlPattern="/wps/seedlist/myserver" matchType="notContain"/>
+            </authFilter>
+
+            <!-- # The "client01" is arbitrary. Any name will do
+            # The clientId is provided by the OpenID Connect (OIDC) identity provider (like Google, Facebook, etc)
+            # In the case of Okta Auth0, "clientId" comes from the Auth0 website field in Applications called "Client ID". 
+            # Likewise, "clientSecret" is also provided by your OIDC identity provider
+            # The "discoveryEndpointUrl" parameter is a "well known" URL for which one only needs to update the host portion of the URL. 
+            # For Okta Auth0, that host portion once again comes from the Auth0 web site field labeled "Domain".
+            # Surprisingly, the signature algorithm is not detected from the discovery endpoint. 
+            # Therefore, this field was explicitly added into the server.xml.
+            # The "userIdentifier" parameter is dependent on which field in the returned JSON from your OIDC provider.
+            # In the case of Auth0, map to the RDN field "UID" in the LDAP or server.xml file repository for users, 
+            # which in this case, is "nickname" field in the returned JSON. 
+            # The authFilterRef references the filter above to exclude XMLAccess and Search v2 from OIDC authentication. -->
+            <openidConnectClient id="client01"
+              clientId="the client ID"
+              clientSecret="The client secret"
+              discoveryEndpointUrl="https://a host name/.well-known/openid-configuration"
+              signatureAlgorithm="RS256"
+              userIdentifier="nickname"
+              authFilterRef="oidcAuthFilter">
+            </openidConnectClient>
+
+            <jwt>
+              <keyManager>
+                <!-- # Update the host name of the URL to match the "Domain" field of the Auth0 web site. --> 
+                <jwkSetUri>https://a host name/.well-known/jwks.json</jwkSetUri>
+              </keyManager>
+            </jwt>
+          </server>
+    propertiesFilesOverrides:
+      ConfigService.properties:
+        # These properties will force the web page shown to the user of the Portal site on logout. 
+        redirect.logout: "true"
+        redirect.logout.ssl: "true"
+        redirect.logout.url: "https://{the fully qualified URL to be shown to the user upon logout}"

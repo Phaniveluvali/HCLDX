@@ -1,0 +1,49 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: Core
+
+{{- if and (eq (include "hcl-dx-deployment.coreEnabled" .) "true") .Values.configuration.core.tuning.configWizard }}
+
+# This service always forwards traffic to the first Core Pod (core-0) even if the status is not ready
+# It is mainly used for Config Wizard which may restart the Portal server and therefore make the Pod unready.
+# Even when Portal is not running, Config Wizard will still be able to connect to the Pod
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-core-unready-pod-0"
+  annotations: 
+  {{- if (.Values.annotations.service.core) }}
+  {{- range $customAnnotationValue := .Values.annotations.service.core }}
+    {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  labels:
+    app: "{{ .Release.Name }}-core"
+  {{- if (.Values.labels.service.core) }}
+  {{- range $customLabelValue := .Values.labels.service.core }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+  {{- end }}
+  {{- end }}
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  type: "ClusterIP"
+  # We want to redirect to Pods even when they are not ready
+  publishNotReadyAddresses: true
+  ports:
+    {{- include "hcl-dx-deployment.corePortList" . | nindent 4 }}
+  selector:
+    app: "{{ .Release.Name }}-core"
+    statefulset.kubernetes.io/pod-name: "{{ .Release.Name }}-core-0"
+
+{{- end }}

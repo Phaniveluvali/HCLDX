@@ -1,0 +1,118 @@
+Installation of HCL DX {{ .Chart.AppVersion }} done.
+{{ if eq (include "hcl-dx-deployment.webEngineEnabled" .) "true" }}
+See https://help.hcl-software.com/digital-experience/dx-compose/latest/ for further information.
+{{ else }}
+See https://opensource.hcltechsw.com/digital-experience/latest/deployment/install/container/helm_deployment/overview/ for further information.
+{{ end }}
+{{- if (eq (typeOf .Values.networking.core.ssl) "string") }}
+DEPRECATION: The type assigned to networking.core.ssl is outdated, please use the correct type i.e "boolean"
+{{- end }}
+{{- if (eq (typeOf .Values.networking.core.port) "string") }}
+DEPRECATION: The type assigned to networking.core.port is outdated, please use the correct type i.e "integer"
+{{- end }}
+{{- if (eq (typeOf .Values.networking.addon.ssl) "string") }}
+DEPRECATION: The type assigned to networking.addon.ssl is outdated, please use the correct type i.e "boolean"
+{{- end }}
+{{- if (eq (typeOf .Values.networking.addon.port) "string") }}
+DEPRECATION: The type assigned to networking.addon.port is outdated, please use the correct type i.e "integer"
+{{- end }}
+{{- if (eq (typeOf .Values.configuration.core.ldap.port) "string") }}
+DEPRECATION: The type assigned to configuration.core.ldap.port is outdated, please use the correct type i.e "integer"
+{{- end }}
+{{- if (eq (typeOf .Values.networking.addon.contentComposer.corsOrigin) "string") }}
+DEPRECATION: The type assigned to networking.addon.contentComposer.corsOrigin is outdated, please use the correct type i.e "array"
+{{- end }}
+{{- if (eq (typeOf .Values.networking.addon.damPluginGoogleVision.corsOrigin) "string") }}
+DEPRECATION: The type assigned to networking.addon.damPluginGoogleVision.corsOrigin is outdated, please use the correct type i.e "array"
+{{- end }}
+{{- if (eq (typeOf .Values.networking.addon.digitalAssetManagement.corsOrigin) "string") }}
+DEPRECATION: The type assigned to networking.addon.digitalAssetManagement.corsOrigin is outdated, please use the correct type i.e "array"
+{{- end }}
+{{- if (eq (typeOf .Values.networking.addon.imageProcessor.corsOrigin) "string") }}
+DEPRECATION: The type assigned to networking.addon.imageProcessor.corsOrigin is outdated, please use the correct type i.e "array"
+{{- end }}
+{{- if (eq (typeOf .Values.networking.addon.ringApi.corsOrigin) "string") }}
+DEPRECATION: The type assigned to networking.addon.ringApi.corsOrigin is outdated, please use the correct type i.e "array"
+{{- end }}
+{{- if (eq (typeOf .Values.networking.addon.damPluginKaltura.corsOrigin) "string") }}
+DEPRECATION: The type assigned to networking.addon.damPluginKaltura.corsOrigin is outdated, please use the correct type i.e "array"
+{{- end }}
+{{- if (eq (typeOf .Values.configuration.core.ldap.attributeMappingLdap) "string") }}
+DEPRECATION: The type assigned to configuration.core.ldap.attributeMappingLdap is outdated, please use the correct type i.e "array"
+{{- end }}
+{{- if (eq (typeOf .Values.configuration.core.ldap.attributeMappingPortal) "string") }}
+DEPRECATION: The type assigned to configuration.core.ldap.attributeMappingPortal is outdated, please use the correct type i.e "array"
+{{- end }}
+{{- if (eq (typeOf .Values.configuration.core.ldap.attributeNonSupported) "string") }}
+DEPRECATION: The type assigned to configuration.core.ldap.attributeNonSupported is outdated, please use the correct type i.e "array"
+{{- end }}
+{{- if (.Values.maintenanceMode.contentComposer) }}
+ATTENTION: Maintenance mode is enabled for Pods: Content Composer
+{{- end }}
+{{- if (.Values.maintenanceMode.core) }}
+ATTENTION: Maintenance mode is enabled for Pods: Core
+{{- end }}
+{{- if (.Values.maintenanceMode.damPluginGoogleVision) }}
+ATTENTION: Maintenance mode is enabled for Pods: DAM Plugin Google Vision
+{{- end }}
+{{- if (.Values.maintenanceMode.digitalAssetManagement) }}
+ATTENTION: Maintenance mode is enabled for Pods: Digital Asset Management
+{{- end }}
+{{- if (.Values.maintenanceMode.imageProcessor) }}
+ATTENTION: Maintenance mode is enabled for Pods: Image Processor
+{{- end }}
+{{- if (.Values.maintenanceMode.openLdap) }}
+ATTENTION: Maintenance mode is enabled for Pods: Open LDAP
+{{- end }}
+{{- if (.Values.maintenanceMode.persistenceConnectionPool) }}
+ATTENTION: Maintenance mode is enabled for Pods: Persistence Connections Pool
+{{- end }}
+{{- if (.Values.maintenanceMode.persistenceNode) }}
+ATTENTION: Maintenance mode is enabled for Pods: Persistence Node
+{{- end }}
+{{- if (.Values.maintenanceMode.remoteSearch) }}
+ATTENTION: Maintenance mode is enabled for Pods: Remote Search
+{{- end }}
+{{- if (.Values.maintenanceMode.ringApi) }}
+ATTENTION: Maintenance mode is enabled for Pods: Ring API
+{{- end }}
+{{- if (.Values.maintenanceMode.runtimeController) }}
+ATTENTION: Maintenance mode is enabled for Pods: Runtime Controller
+{{- end }}
+{{- if (.Values.maintenanceMode.haproxy) }}
+ATTENTION: Maintenance mode is enabled for Pods: HAProxy
+{{- end }}
+{{- if (.Values.maintenanceMode.licenseManager) }}
+ATTENTION: Maintenance mode is enabled for Pods: Licence Manager
+{{- end }}
+{{- if (.Values.maintenanceMode.damPluginKaltura) }}
+ATTENTION: Maintenance mode is enabled for Pods: DAM Plugin Kaltura
+{{- end }}
+{{ if ne (include "hcl-dx-deployment.webEngineEnabled" .) "true" }}
+{{ if and ( .Release.IsInstall) (.Values.security.core.wpsUser) (not .Values.security.core.wpsPassword) (not .Values.security.core.customWpsSecret) }}
+# Use the following kubectl command to get the credentials for HCL Digital Experience Core administrative access:
+kubectl get secret {{ .Release.Name }}-core-wps --namespace {{ .Release.Namespace }} -o=jsonpath="{.data.username}" | base64 --decode | base64 --decode && echo
+kubectl get secret {{ .Release.Name }}-core-wps --namespace {{ .Release.Namespace }} -o=jsonpath="{.data.password}" | base64 --decode | base64 --decode && echo
+{{- end }}
+{{ if and ( .Release.IsInstall) (.Values.security.core.wasUser) (not .Values.security.core.wasPassword) (not .Values.security.core.customWasSecret) }}
+# Use the following kubectl command to get the credentials for IBM WebSphere Application Server administrative access:
+kubectl get secret {{ .Release.Name }}-core-was --namespace {{ .Release.Namespace }} -o=jsonpath="{.data.username}" | base64 --decode | base64 --decode && echo
+kubectl get secret {{ .Release.Name }}-core-was --namespace {{ .Release.Namespace }} -o=jsonpath="{.data.password}" | base64 --decode | base64 --decode && echo
+{{- end }}
+{{ if and ( .Release.IsInstall) (.Values.security.core.configWizardUser) (not .Values.security.core.configWizardPassword) (not .Values.security.core.customConfigWizardSecret) }}
+# Use the following kubectl command to get the credentials for Config Wizard administrative access:
+kubectl get secret {{ .Release.Name }}-core-configwizard --namespace {{ .Release.Namespace }} -o=jsonpath="{.data.username}" | base64 --decode | base64 --decode && echo
+kubectl get secret {{ .Release.Name }}-core-configwizard --namespace {{ .Release.Namespace }} -o=jsonpath="{.data.password}" | base64 --decode | base64 --decode && echo
+{{- end }}
+{{ if and ( .Release.IsInstall) (.Values.security.remoteSearch.wasUser) (not .Values.security.remoteSearch.wasPassword) (not .Values.security.remoteSearch.customWasSecret) }}
+# Use the following kubectl command to get the Remote Search credentials for IBM WebSphere Application Server administrative access:
+kubectl get secret {{ .Release.Name }}-remote-search-was --namespace {{ .Release.Namespace }} -o=jsonpath="{.data.username}" | base64 --decode | base64 --decode && echo
+kubectl get secret {{ .Release.Name }}-remote-search-was --namespace {{ .Release.Namespace }} -o=jsonpath="{.data.password}" | base64 --decode | base64 --decode && echo
+{{- end }}
+{{ else }}
+{{ if and ( .Release.IsInstall) (.Values.security.webEngine.webEngineUser) (not .Values.security.webEngine.webEnginePassword) (not .Values.security.webEngine.customWebEngineSecret) }}
+# Use the following kubectl command to get the credentials for HCL Digital Experience Compose WebEngine administrative access:
+kubectl get secret {{ .Release.Name }}-web-engine-wps --namespace {{ .Release.Namespace }} -o=jsonpath="{.data.username}" | base64 --decode && echo
+kubectl get secret {{ .Release.Name }}-web-engine-wps --namespace {{ .Release.Namespace }} -o=jsonpath="{.data.password}" | base64 --decode && echo
+{{- end }}
+{{- end }}

@@ -1,0 +1,241 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2024. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Deployment incl. Pods
+# For Service: persistence-connection-pool
+
+{{- if eq (include "hcl-dx-deployment.persistenceEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "{{ .Release.Name }}-persistence-connection-pool"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  {{- if (.Values.scaling) }}
+  {{- if (.Values.scaling.replicas) }}  
+  replicas: {{ .Values.scaling.replicas.persistenceConnectionPool }}
+  {{- end }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-persistence-connection-pool"
+  template:
+    metadata:
+      annotations:
+      {{- if (.Values.annotations.pod.persistenceConnectionPool) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.persistenceConnectionPool }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config-persistence-connection-pool: "{{- include "hcl-dx-deployment.persistenceConnectionPoolConfig" . | sha256sum }}"
+      labels:
+      {{- if (.Values.labels.pod.persistenceConnectionPool) }}
+      {{- range $customLabelValue := .Values.labels.pod.persistenceConnectionPool }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-persistence-connection-pool"
+            # Using general labels, see _deployment_helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.persistenceConnectionPool)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.persistenceConnectionPool) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.persistenceConnectionPool)}}
+      affinity:
+        {{- toYaml (.Values.affinity.persistenceConnectionPool) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.persistenceConnectionPool)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.persistenceConnectionPool) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.persistenceConnectionPool)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.persistenceConnectionPool) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.persistenceConnectionPool)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.persistenceConnectionPool) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.persistenceConnectionPool)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.persistenceConnectionPool) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: "persistence-connection-pool"
+          # Build the image attribute by using the repository and image tag
+          {{- if (.Values.images.tags) }}
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.persistenceConnectionPool }}:{{ .Values.images.tags.persistenceConnectionPool }}"
+          {{- end }}
+          # Adjust the image pull policy based on the CHart value
+          {{- if (.Values.images) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          {{- end }}
+          # Add lifecycle hooks
+          {{- if eq (.Values.configuration.digitalAssetManagement.newDbManagement) true }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - "/bin/sh"
+                  - "-c"
+                  - "/opt/hooks/pre-stop.sh"
+          {{- end }}
+          # Port exposure configuration
+          ports:
+            - name: "persistence"
+              containerPort: {{ include "hcl-dx-deployment.ports.persistence.pgpool" . }}
+          env:
+          {{- if (.Values.environment.pod.persistenceConnectionPool) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.persistenceConnectionPool }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.persistenceConnectionPool | quote }} 
+            # Environment variable for new DB management mode
+            - name: "NEW_DB_MANAGEMENT"
+              value: {{ .Values.configuration.digitalAssetManagement.newDbManagement | quote }}
+          {{- if ne (.Values.configuration.digitalAssetManagement.newDbManagement) true }}
+          # PGPOOL Backend Nodes information. This will be created based on the number of Persistence Node replicas.
+            - name: "PGPOOL_BACKEND_NODES"
+            {{ $persistenceNodeReplicas := .Values.scaling.replicas.persistenceNode | int }}
+            {{ $releaseName := .Release.Name }}
+              value: "{{ range $i, $e:= until $persistenceNodeReplicas }}{{ $i }}:{{ $releaseName }}-persistence-node-{{ $i }}.{{ $releaseName }}-persistence-headless-svc:{{ include "hcl-dx-deployment.ports.persistence.repmgr" . }},{{ end }}"
+            - name: "PGPOOL_ADMIN_USERNAME"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-connection-pool-admin"
+            - name: "PGPOOL_ADMIN_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-connection-pool-admin"
+            - name: "PGPOOL_SR_CHECK_USER"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-replication"    
+            - name: "PGPOOL_SR_CHECK_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-replication"
+            - name: "PGPOOL_POSTGRES_USERNAME"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-user" 
+            - name: "PGPOOL_POSTGRES_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-user"      
+            - name: "PGPOOL_POSTGRES_CUSTOM_USERS"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-dam-user"  
+            - name: "PGPOOL_POSTGRES_CUSTOM_PASSWORDS"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-dam-user"
+          {{- end }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.persistenceConnectionPool) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            exec:
+              command:
+                - "/scripts/healthcheck.sh"
+                - "liveness"
+          {{- with .Values.probes.persistenceConnectionPool.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.persistenceConnectionPool) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            exec:
+              command:
+                - "/scripts/healthcheck.sh"
+                - "readiness"
+          {{- with .Values.probes.persistenceConnectionPool.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if and (.Values.resources) (.Values.resources.persistenceConnectionPool) }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.persistenceConnectionPool.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.persistenceConnectionPool.requests.cpu }}"
+              memory: "{{ .Values.resources.persistenceConnectionPool.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.persistenceConnectionPool.limits) }}
+            limits:
+              {{- if (.Values.resources.persistenceConnectionPool.limits.cpu) }}
+              cpu: "{{ .Values.resources.persistenceConnectionPool.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.persistenceConnectionPool.limits.memory) }}
+              memory: "{{ .Values.resources.persistenceConnectionPool.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+      volumes:
+        - name: "config"
+          configMap:
+            name: "{{ .Release.Name }}-persistence-connection-pool"
+        - name: "global-config"
+          configMap:
+            name: "{{ .Release.Name }}-global"
+{{- end }}

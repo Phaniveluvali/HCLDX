@@ -1,0 +1,44 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: WebEngine
+
+{{- if eq (include "hcl-dx-deployment.webEngineEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-web-engine-headless"
+  annotations: 
+  {{- if (.Values.annotations.service.webEngine) }}
+  {{- range $customAnnotationValue := .Values.annotations.service.webEngine }}
+    {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  labels:
+    app: "{{ .Release.Name }}-web-engine-headless"
+  {{- if (.Values.labels.service.webEngine) }}
+  {{- range $customLabelValue := .Values.labels.service.webEngine }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+  {{- end }}
+  {{- end }}
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  type: "ClusterIP"
+  clusterIP: "None"
+  ports:
+    {{- include "hcl-dx-deployment.webEnginePortList" . | nindent 4 }}
+  selector:
+    app: "{{ .Release.Name }}-web-engine"
+
+{{- end }}

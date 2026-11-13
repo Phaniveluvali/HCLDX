@@ -1,0 +1,256 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022, 2024. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+ 
+# This template creates:
+# Resources: StatefulSet incl. Pods and PVC for database
+# For Service: License-Manager
+
+{{- if eq (include "hcl-dx-deployment.licenseManagerEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "StatefulSet"
+metadata:
+  name: "{{ .Release.Name }}-license-manager"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  {{- if (.Values.scaling) }}
+  {{- if (.Values.scaling.replicas) }}  
+  replicas: {{ .Values.scaling.replicas.licenseManager }}
+  {{- end }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-license-manager"
+  serviceName: "{{ .Release.Name }}-license-manager"
+  # Per pod volume claims
+  volumeClaimTemplates:
+    {{- if (.Values.volumes) }}
+    {{- if (.Values.volumes.licenseManager) }}
+    {{- if (.Values.volumes.licenseManager.data) }}
+    # Database PVC
+    - metadata:
+        name: "data"
+      spec:
+        accessModes: 
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: {{ .Values.volumes.licenseManager.data.requests.storage }}
+        storageClassName:  {{ .Values.volumes.licenseManager.data.storageClassName }}
+        {{ if .Values.volumes.licenseManager.data.selector }}
+        selector: {{- toYaml (.Values.volumes.licenseManager.data.selector) | nindent 10 }}
+        {{ end }}
+        {{ if .Values.volumes.licenseManager.data.volumeName }}
+        volumeName: "{{ .Values.volumes.licenseManager.data.volumeName }}-node"
+        {{ end }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+  template:
+    metadata:
+      annotations:
+      {{- if (.Values.annotations.pod.licenseManager) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.licenseManager }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config-license-manager: "{{- include "hcl-dx-deployment.licenseManagerConfig" . | sha256sum }}"
+      labels:
+      {{- if (.Values.labels.pod.licenseManager) }}
+      {{- range $customLabelValue := .Values.labels.pod.licenseManager }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-license-manager"
+            # Using general labels, see _deployment_helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.licenseManager)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.licenseManager) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.licenseManager)}}
+      affinity:
+        {{- toYaml (.Values.affinity.licenseManager) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.licenseManager)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.licenseManager) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.licenseManager)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.licenseManager) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.licenseManager)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.licenseManager) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.licenseManager)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.licenseManager) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      securityContext:
+        fsGroup: 1001
+        runAsUser: 1000
+        runAsGroup: 1001
+        runAsNonRoot: true
+        supplementalGroups:
+        - 1001
+      containers:
+        - name: "license-manager"
+          # Build the image attribute by using the repository and image tag
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.licenseManager }}:{{ .Values.images.tags.licenseManager }}"
+          # Adjust the image pull policy based on the CHart value
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          # Environment parameters
+          env:
+          {{- if .Values.applications.webEngine }}
+            - name: IS_WEB_ENGINE
+              value: "true"
+          {{- end }}
+          {{- if (.Values.environment.pod.licenseManager) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.licenseManager }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if or (not (empty (include "hcl-dx-deployment.serviceAccountName" .))) .Values.configuration.licenseManager.licenseConfigSecret }}
+            - name: IS_AWS_DEPLOYMENT
+              value: "true"
+          {{- end }}
+          {{- if .Values.configuration.licenseManager.licenseConfigSecret }}
+          # Mount the license volume to the container image
+            - name: AWS_WEB_IDENTITY_REFRESH_TOKEN_FILE
+              value: "/var/run/secrets/product-license/license_token"
+            - name: AWS_ROLE_ARN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.configuration.licenseManager.licenseConfigSecret }}
+                  key: iam_role
+          {{- end }}
+          {{- if or .Values.configuration.licenseManager.customMhsDeploymentKeySecret .Values.configuration.licenseManager.mhsDeploymentKey  }}
+            - name: IS_MHS_DEPLOYMENT
+              value: "true"
+          
+          {{- if .Values.configuration.licenseManager.customMhsDeploymentKeySecret }}
+            - name: MHS_DEPLOYMENT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.configuration.licenseManager.customMhsDeploymentKeySecret }}
+                  key: deploymentKey
+          {{- end }}
+          {{- if .Values.configuration.licenseManager.mhsDeploymentKey }}
+            - name: MHS_DEPLOYMENT_KEY
+              value: {{ .Values.configuration.licenseManager.mhsDeploymentKey }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "HAPROXY_HEADLESS"
+              value: "{{ .Release.Name }}-haproxy-headless.{{ .Release.Namespace }}.svc.cluster.local"
+            - name: "productionEnvironment"
+              value: "{{ include "hcl-dx-deployment.productionEnvironment" . }}"
+            - name: "licenseServerUri"
+              value: "{{ include "hcl-dx-deployment.licenseServerUri" . }}"
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.licenseManager | quote }}
+            - name: "SOURCE_IDENTITY"
+          {{- if (.Values.configuration.licenseManager.licenseManualReportUniqueIdentifier) }}
+              value: "{{ .Values.configuration.licenseManager.licenseManualReportUniqueIdentifier }}"
+          {{- else }}
+              value: "{{ .Release.Name }}-{{ .Release.Namespace }}"
+          {{- end }}
+          # Port exposure configuration
+          ports:
+            - name: "license-manager"
+              containerPort: {{ include "hcl-dx-deployment.ports.licenseManager.serverContainerPort" . }}
+          # Liveness probe
+          livenessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - /usr/local/runme/probe.sh
+          {{- with .Values.probes.licenseManager.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - /usr/local/runme/probe.sh
+          {{- with .Values.probes.licenseManager.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if and (.Values.resources) (.Values.resources.licenseManager) }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.licenseManager.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.licenseManager.requests.cpu }}"
+              memory: "{{ .Values.resources.licenseManager.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.licenseManager.limits) }}
+            limits:
+              {{- if (.Values.resources.licenseManager.limits.cpu) }}
+              cpu: "{{ .Values.resources.licenseManager.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.licenseManager.limits.memory) }}
+              memory: "{{ .Values.resources.licenseManager.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+          - name: "data"
+            mountPath: "/mnt"
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+          {{- if .Values.configuration.licenseManager.licenseConfigSecret }}
+          - name: awsmp-product-license
+            mountPath: "/var/run/secrets/product-license"
+          {{- end }}
+      volumes:
+      - name: "config"
+        configMap:
+          name: "{{ .Release.Name }}-license-manager"
+      - name: "global-config"
+        configMap:
+          name: "{{ .Release.Name }}-global"
+      {{- if .Values.configuration.licenseManager.licenseConfigSecret }}
+      - name: awsmp-product-license
+        secret:
+          secretName: {{ .Values.configuration.licenseManager.licenseConfigSecret }}
+          optional: true
+      {{- end }}
+{{- end }}

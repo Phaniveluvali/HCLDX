@@ -1,0 +1,45 @@
+{{- if .Values.networking.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "hcl-people-service.fullname" . }}
+  labels:
+    app: {{ include "hcl-people-service.fullname" . }}
+    {{- include "hcl-people-service.labels" . | nindent 4 }}
+  {{- if .Values.networking.ingress.annotations }}
+  annotations:
+    {{- .Values.networking.ingress.annotations | toYaml | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.networking.ingress.ingressClassName }}
+  rules:
+    - host: {{ .Values.networking.host }}
+      http:
+        paths:
+          - path: {{ .Values.networking.contextRoot.ui }}
+            pathType: {{ .Values.networking.ingress.pathType }}
+            backend:
+              service:
+                name: {{ include "hcl-people-service.fullname" . }}
+                port:
+                  number: {{ .Values.service.ports.http }}
+          - path: {{ .Values.networking.contextRoot.api }}
+            pathType: {{ .Values.networking.ingress.pathType }}
+            backend:
+              service:
+                name: {{ include "hcl-people-service.fullname" . }}
+                port:
+                  number: {{ .Values.service.ports.http }}
+  {{- if or .Values.networking.ingress.existingSecret .Values.networking.ingress.autoGenerateSelfSignedCert }}                  
+  tls:
+    - hosts:
+        - {{ .Values.networking.host }}
+      {{- if .Values.networking.ingress.existingSecret }}
+      secretName: {{ .Values.networking.ingress.existingSecret }}
+      {{- else if .Values.networking.ingress.autoGenerateSelfSignedCert }}
+      secretName: {{ printf "%s-tls" .Values.networking.host }}
+      {{- else }}
+        {{- fail "Existing TLS secret not provided and autoGenerateSelfSignedCert is disabled. Please provide a TLS secret or enable autoGenerateSelfSignedCert." }} 
+      {{- end }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,43 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: Core
+
+{{- if eq (include "hcl-dx-deployment.coreEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-core"
+  annotations: 
+  {{- if (.Values.annotations.service.core) }}
+  {{- range $customAnnotationValue := .Values.annotations.service.core }}
+    {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  labels:
+    app: "{{ .Release.Name }}-core"
+  {{- if (.Values.labels.service.core) }}
+  {{- range $customLabelValue := .Values.labels.service.core }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+  {{- end }}
+  {{- end }}
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  type: "ClusterIP"
+  ports:
+    {{- include "hcl-dx-deployment.corePortList" . | nindent 4 }}
+  selector:
+    app: "{{ .Release.Name }}-core"
+
+{{- end }}

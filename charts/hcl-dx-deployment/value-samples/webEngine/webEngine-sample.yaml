@@ -1,0 +1,667 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024, 2025. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Image related configuration
+images:
+  # ----
+  # Please uncomment and replace the tags and names sections if you don't use the images from Harbor.
+  # ----
+  # Image tag for each application
+  # tags:
+  #   webEngine: "REPLACE_ME"
+  # Image name for each application
+  # names:
+  #   webEngine: "REPLACE_ME"
+# Resource allocation settings, definition per pod
+# Use number + unit, e.g. 1500m for CPU or 1500M for Memory
+# The limits can be set to null explicitly to not limit the resources. Cluster and namespace level resource limits will still apply.
+resources:
+  webEngine:
+    requests:
+      cpu: "2000m"
+      memory: "4096Mi"
+    limits:
+      cpu: "4000m"
+      memory: "6144Mi"
+# Annotations for different DX Resources.
+# Type: Array of objects
+# Sample "annotations" configuration:
+#   annotations:
+#     service:
+#       core:
+#         - key: KEY1
+#           value: VALUE1
+#         - key: KEY2
+#           value: VALUE2
+annotations:
+  # Service annotations for DX Resources
+  service:
+    webEngine: []
+  # Pod annotations for DX Resources
+  pod:
+    webEngine: []
+# Labels for different DX Resources.
+# Type: Array of objects
+# Sample "labels" configuration:
+#   labels:
+#     service:
+#       haproxy:
+#         - key: KEY1
+#           value: VALUE1
+#         - key: KEY2
+#           value: VALUE2
+labels:
+  # Service labels for DX Resources
+  service:
+    webEngine: []
+  # Pod labels for DX Resources
+  pod:
+    webEngine: []
+# Host aliases for DX Pods.
+# Sample "hostAliases" configuration:
+#   hostAliases:
+#     core:
+#       - ip: "127.0.0.1"
+#         hostnames:
+#           - "localhost"
+hostAliases:
+  webEngine: []
+# Scaling settings for deployed applications
+scaling:
+  # The default amount of replicas per application
+  replicas:
+    webEngine: 1
+  # Automated scaling using HorizontalPodAutoScaler
+  horizontalPodAutoScaler:
+    # Autoscaling settings for WebEngine
+    webEngine:
+      # Enable or disable autoscaling
+      enabled: false
+      # Minimum and maximum Pod count
+      minReplicas: 1
+      maxReplicas: 3
+      # Target CPU utilization scaling threshold
+      targetCPUUtilizationPercentage: 75
+      # Target Memory utilization scaling threshold
+      targetMemoryUtilizationPercentage: 80
+# Application specific node selector
+# nodeSelector uses following notation: <NODE_LABEL_KEY>: <NODE_LABEL_VALUE>
+# e.g. nodeSelector
+# nodeSelector:
+#   contentComposer:
+#     diskType: ssd
+nodeSelector:
+  webEngine:
+# Affinity and anti-affinity expands the types of constraints you can define
+# e.g affinity
+# affinity:
+#   contentComposer:
+#     nodeAffinity:
+#       requiredDuringSchedulingIgnoredDuringExecution:
+#         nodeSelectorTerms:
+#           - matchExpressions:
+#               - key: topology.kubernetes.io/zone
+#                 operator: In
+#                 values:
+#                   - antarctica-east1
+#                   - antarctica-west1
+#       preferredDuringSchedulingIgnoredDuringExecution:
+#         - weight: 1
+#           preference:
+#             matchExpressions:
+#               - key: another-node-label-key
+#                 operator: In
+#                 values:
+#                   - another-node-label-value
+#     podAffinity:
+#       requiredDuringSchedulingIgnoredDuringExecution:
+#         - labelSelector:
+#             matchExpressions:
+#               - key: security
+#                 operator: In
+#                 values:
+#                   - S1
+#           topologyKey: topology.kubernetes.io/zone
+#     podAntiAffinity:
+#       preferredDuringSchedulingIgnoredDuringExecution:
+#         - weight: 100
+#           podAffinityTerm:
+#             labelSelector:
+#               matchExpressions:
+#                 - key: security
+#                   operator: In
+#                   values:
+#                     - S2
+#             topologyKey: topology.kubernetes.io/zone
+affinity:
+  webEngine:
+# nodeName is a field in the Pod spec. If the nodeName field is not empty, the scheduler ignores the Pod and the kubelet on the named node tries to place the Pod on that node.
+# e.g nodeName
+# nodeName:
+#   contentComposer: "node-0"
+nodeName:
+  webEngine: ""
+# Tolerations are applied to pods. Tolerations allow the scheduler to schedule pods with matching taints.
+# e.g tolerations
+# tolerations:
+#   contentComposer:
+#   - key: "key1"
+#     operator: "Equal"
+#     value: "value1"
+#     effect: "NoSchedule"
+tolerations:
+  webEngine:
+# You can use topology spread constraints to control how Pods are spread across your cluster among failure-domains such as regions, zones, nodes, or among any other topology domains that you define.
+# e.g topologySpreadConstraints:
+# topologySpreadConstraints:
+#   contentComposer:
+#   - maxSkew: 1
+#     topologyKey: zone
+#     whenUnsatisfiable: DoNotSchedule #ScheduleAnyway
+#     labelSelector:
+#       matchLabels:
+#         app: dx-deployment-content-composer
+topologySpreadConstraints:
+  webEngine:
+# Persistent Volume Setup
+volumes:
+  # Persistent Volumes for webEngine
+  webEngine:
+    # Customization PVC one per webEngine pod - RWO
+    customization:
+      storageClassName: "manual"
+      requests:
+        storage: "500Mi"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+      # Optional volume name to specifically map to
+      volumeName:
+    # Application Log PVC, one per Core pod - RWO
+    log:
+      storageClassName: "manual"
+      requests:
+        storage: "250Mi"
+      # Optional label selector to further filter the set of volumes. Only the volumes whose labels match the selector can be bound to the claim.
+      selector:
+      # Optional volume name to specifically map to
+      volumeName:
+    # Custom PVCs for webEngine
+    customPVCs: []
+# Controls which application is deployed and configured
+applications:
+  # Deploys Core
+  core: false
+  # Deploys webEngine
+  webEngine: true
+# Networking specific configuration
+networking:
+  # Networking configuration specific to webEngine
+  webEngine:
+    # Host of webEngine, must be specified as a FQDN
+    host: ""
+    # Port of webEngine
+    port:
+    # Setting if SSL is enabled for webEngine
+    ssl: true
+    # webEngine Context root, only alter if your deployment already uses a non default context route
+    contextRoot: "wps"
+    # webEngine personalized home, only alter if your deployment already uses a non default personalized home
+    personalizedHome: "myportal"
+    # webEngine home, only alter if your deployment already uses a non default home
+    home: "portal"
+    # None, Lax, Strict, or empty string
+    # Setting this to an empty string would not add the SameSite attribute for WASReqURL cookie
+    # Note: This should only be set in an HTTPS environment to prevent unwanted behaviours
+    cookieSameSiteAttribute: ""
+    # Enables/Disables CSP frame-ancestor header
+    # Note: 'self' is always added when this is enabled to enable DX internal features
+    # see: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors
+    cspFrameAncestorsEnabled: false
+    # Add list of allowed source URLS to the the CSP frame-ancestor header this will only reflect if cspFrameAncestorsEnabled is set to true
+    # Example:
+    # cspFrameAncestorsAllowedSourceURLs:
+    #   - 'https://example.com'
+    # This would result to the following response header:
+    # content-security-policy: frame-ancestors 'self' https://example.com
+    cspFrameAncestorsAllowedSourceURLs: []
+# Security related configuration, e.g. default credentials
+security:
+  # Security configuration for webEngine
+  webEngine:
+    # Credentials used for WebEngine Server administrative access.
+    # The credentials defined in these values define the WebEngine primary administrative user. The user gets created if necessary and/or the password is set to the current value.
+    # - If LDAP is configured as the user repository, the WebSphere Application Server admin user won't be applied automatically and LDAP has the authority over the credentials. Whenever the credentials are changed in LDAP, the values for wpsUser and wpsPassword need to be manually updated accordingly.
+    # Current Limitation: It is currently not possible to change the webEngineUser from wpsadmin. However, the webEnginePassword can be updated.
+    webEngineUser: "wpsadmin"
+    webEnginePassword: ""
+    # Provide a secret name that will be used to set credentials for WPS
+    # Required attributes:
+    #   - username
+    #   - password
+    customWebEngineSecret: ""
+    # Security configuration for AI APIs: 
+    # API key for AI Provider
+    webEngineContentAIProviderAPIKey: ""
+    # Provide a secret name that will be used to set AI API Keys
+    customWebEngineContentAISecret: ""
+# Kubernetes probe configuration for application Pods
+probes:
+  # WebEngine probe configuration
+  webEngine:
+    # Liveness probe using the application shell based probe
+    livenessProbe:
+      failureThreshold: 6
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 10
+    # Readiness probe using the application shell based probe
+    readinessProbe:
+      failureThreshold: 1
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 30
+    # Startup probe using the application shell based probe
+    startupProbe:
+      failureThreshold: 360
+      initialDelaySeconds: 30
+      periodSeconds: 20
+      successThreshold: 1
+      timeoutSeconds: 10
+# Logging configuration
+logging:
+  # WebEngine specific logging configuration
+  webEngine:
+    # Valid log levels for all entries: off, fatal, severe, warning, audit, info, config, detail, fine, finer, finest, all
+    # 
+    # Define log levels for each logger. The following entries specify the logger and the desired level:
+    # - "*=info" sets the default log level for all components.
+    # - "com.ibm.wps.logging.ExceptionLogger=all" sets the log level for ExceptionLogger. This can be changed to any valid log level.
+    # 
+    # Example entries for additional loggers (add them below the active ones if needed):
+    # - "com.ibm.websphere=finest"
+    # - "com.ibm.ejs=warning"
+    # - "com.ibm.trace=audit"
+    level:
+      - "*=info" # Global default log level
+      - "com.ibm.wps.logging.ExceptionLogger=all" # ExceptionLogger default level
+    # List of sidecar containers mapping a container name to a file path for a log file to be exposed
+    # Each element must consist of a `containerName` and a `logFilePath`, the latter must be located in one of the mounted volumes.
+    # The mounted volumes include the path `/opt/HCL/logs` and any custom PVC mountPaths specified in `volumes.webEngine.customPVCs`
+    # `logFilePath` can be a file name pattern, use `*` in file path to make generic value. For example `/opt/HCL/logs/*/test.log` or `/opt/HCL/logs/verbosegc.*`
+    # Example:
+    # customLogSidecarContainers:
+    #   - containerName: "console-log"
+    #     logFilePath: "/var/logs/console.log"
+    customLogSidecarContainers: []
+# Application specific metrics
+metrics:
+  # Metrics for webEngine
+  webEngine:
+    # Determine if the webEngine Core metrics are scraped by prometheus
+    scrape: true
+    # Determines the way Prometheus discovers the metrics of a service
+    # Accepts: "annotation" or "serviceMonitor"
+    #   "annotation" - adds the Prometheus annotation to the deployment that can be discovered by Prometheus
+    #   "serviceMonitor" - creates a ServiceMonitor custom resource that can be discovered by Prometheus Operator
+    # The "serviceMonitor" setting requires the ServiceMonitor CRD to be installed in the cluster which comes with Prometheus Operator
+    prometheusDiscoveryType: "annotation"
+# Application configuration
+configuration:
+  # Application specific configuration for webEngine
+  webEngine:
+    # The configOverrideFiles parameter can be used to pass Web Engine server configuration snippets to the DX server.
+    # The snippets will be merged into the default server.xml according to https://openliberty.io/docs/latest/reference/config/server-configuration-overview.html
+    # Changes are picked up by Web Engine Server and applied at runtime. They don't require a Pod restart.
+    # Example configuration:
+    #
+    # configuration:
+    #   webEngine:
+    #     configOverrideFiles:
+    #       myCustomOverride.xml: |
+    #         <server description="dxServer">
+    #           <.../>
+    #         </server>
+    #
+    configOverrideFiles: {}
+    # Enable or disable debug option for the Web Engine
+    # Enabling debug option requires a server restart for the changes to take effect.
+    # Disabling debug option does not require a server restart.
+    # Once debug option is enabled, you can connect using Eclipse or a similar tool to attach the debugger on port 7777.
+    # WARNING: Enabling debug option may impact performance and expose sensitive information. It is recommended to enable it only in development or controlled environments.
+    debug: false
+    # The propertiesFilesOverrides parameter can be used to add or update properties in specific properties files stored on the webEngine server.
+    # After updating the values, you need to restart the server to apply the changes.
+    # Limitation: only changes the properties stored in the services folder.
+    # Example propertiesFilesOverrides:
+    #
+    # configuration:
+    #   webEngine:
+    #     propertiesFilesOverrides:
+    #       FeedbackService.properties: // FeedbackService.properties is the properties file name need to be updated
+    #          feedbackRecordCachePriority: "1" // property to be updated in the FeedbackService.properties
+    #          newProperty: "test"
+    #          logBufferSize: "5001"
+    #
+    propertiesFilesOverrides: {}
+    # The propertiesDisable parameter can be used to disable properties from specific properties files in the webEngine server. It is equivalent to commenting a setting.
+    # After updating the values, you need to restart the server to apply the changes.
+    # Example propertiesDisable:
+    #
+    #
+    # configuration:
+    #   webEngine:
+    #     propertiesDisable:
+    #       FeedbackService.properties: 
+    #         feedbackRecordCachePriority: ""
+    #         logBufferSize: ""
+    propertiesDisable: {}
+    # If set to true, the external database specified in dbDomainProperties will be used for the WebEngine database.
+    # On the first startup of the WebEngine, the database will be transferred automatically from Derby to the external database.
+    useExternalDatabase: false
+    # If set to true, existing WebEngine database tables will be dropped and re-created whenever database transfer is run.
+    dropDatabaseTables: false
+    # Provide a custom secret that will be used to set the DB Domain properties.
+    # Please make sure that the secret uses the following key: dx_dbdomain.properties
+    # If customDbDomainPropertiesSecret is provided then all dbDomainProperties values are ignored
+    customDbDomainPropertiesSecret: ""
+    dbDomainProperties:
+      InitializeFeedbackDB: "true"
+      feedback.DbType: "db2"
+      feedback.DbName: "WPFDBK"
+      feedback.DbSchema: "feedback"
+      feedback.DataSourceName: "wpfdbkdbDS"
+      feedback.DbUrl: "jdbc:db2://<replace-db-host>:<replace-db-port>/WPFDBK:returnAlias=0;"
+      feedback.DbUser: "<replace-db-user>"
+      feedback.DbPassword: "<replace-db-password>"
+      feedback.DbRuntimeUser: "<replace-db-user>"
+      feedback.DbRuntimePassword: "<replace-db-password>"
+      feedback.DBA.DbUser: "<replace-db-user>"
+      feedback.DBA.DbPassword: "<replace-db-password>"
+      feedback.DbConfigRoleName: "WP_PZN_CONFIG_USERS"
+      feedback.DbRuntimeRoleName: "WP_PZN_RUNTIME_USERS"
+      feedback.XDbName: "WPFDBK"
+      feedback.DbNode: "pznNode"
+      likeminds.DbType: "db2"
+      likeminds.DbName: "WPLM"
+      likeminds.DbSchema: "likeminds"
+      likeminds.DataSourceName: "wplmdbDS"
+      likeminds.DbUrl: "jdbc:db2://<replace-db-host>:<replace-db-port>/WPLM:returnAlias=0;"
+      likeminds.DbUser: "<replace-db-user>"
+      likeminds.DbPassword: "<replace-db-password>"
+      likeminds.DbRuntimeUser: "<replace-db-user>"
+      likeminds.DbRuntimePassword: "<replace-db-password>"
+      likeminds.DBA.DbUser: "<replace-db-user>"
+      likeminds.DBA.DbPassword: "<replace-db-password>"
+      likeminds.DbConfigRoleName: "WP_PZN_CONFIG_USERS"
+      likeminds.DbRuntimeRoleName: "WP_PZN_RUNTIME_USERS"
+      likeminds.XDbName: "WPLM"
+      likeminds.DbNode: "pznNode"
+      release.DbType: "db2"
+      release.DbName: "WPREL"
+      release.DbSchema: "release"
+      release.DataSourceName: "wpreldbDS"
+      release.DbUrl: "jdbc:db2://<replace-db-host>:<replace-db-port>/WPREL:returnAlias=0;"
+      release.DbUser: "<replace-db-user>"
+      release.DbPassword: "<replace-db-password>"
+      release.DbRuntimeUser: "<replace-db-user>"
+      release.DbRuntimePassword: "<replace-db-password>"
+      release.DBA.DbUser: "<replace-db-user>"
+      release.DBA.DbPassword: "<replace-db-password>"
+      release.DbConfigRoleName: "WP_BASE_CONFIG_USERS"
+      release.DbRuntimeRoleName: "WP_BASE_RUNTIME_USERS"
+      release.XDbName: "WPREL"
+      release.DbNode: "wpsNode"
+      community.DbType: "db2"
+      community.DbName: "WPCOMM"
+      community.DbSchema: "community"
+      community.DataSourceName: "wpcommdbDS"
+      community.DbUrl: "jdbc:db2://<replace-db-host>:<replace-db-port>/WPCOMM:returnAlias=0;"
+      community.DbUser: "<replace-db-user>"
+      community.DbPassword: "<replace-db-password>"
+      community.DbRuntimeUser: "<replace-db-user>"
+      community.DbRuntimePassword: "<replace-db-password>"
+      community.DBA.DbUser: "<replace-db-user>"
+      community.DBA.DbPassword: "<replace-db-password>"
+      community.DbConfigRoleName: "WP_BASE_CONFIG_USERS"
+      community.DbRuntimeRoleName: "WP_BASE_RUNTIME_USERS"
+      community.XDbName: "WPCOMM"
+      community.DbNode: "wpsNode"
+      customization.DbType: "db2"
+      customization.DbName: "WPCUST"
+      customization.DbSchema: "customization"
+      customization.DataSourceName: "wpcustdbDS"
+      customization.DbUrl: "jdbc:db2://<replace-db-host>:<replace-db-port>/WPCUST:returnAlias=0;"
+      customization.DbUser: "<replace-db-user>"
+      customization.DbPassword: "<replace-db-password>"
+      customization.DbRuntimeUser: "<replace-db-user>"
+      customization.DbRuntimePassword: "<replace-db-password>"
+      customization.DBA.DbUser: "<replace-db-user>"
+      customization.DBA.DbPassword: "<replace-db-password>"
+      customization.DbConfigRoleName: "WP_BASE_CONFIG_USERS"
+      customization.DbRuntimeRoleName: "WP_BASE_RUNTIME_USERS"
+      customization.XDbName: "WPCUST"
+      customization.DbNode: "wpsNode"
+      jcr.DbType: "db2"
+      jcr.DbName: "WPJCR"
+      jcr.DbSchema: "jcr"
+      jcr.DataSourceName: "wpjcrdbDS"
+      jcr.DbUrl: "jdbc:db2://<replace-db-host>:<replace-db-port>/WPJCR:returnAlias=0;"
+      jcr.DbUser: "<replace-db-user>"
+      jcr.DbPassword: "<replace-db-password>"
+      jcr.DbRuntimeUser: "<replace-db-user>"
+      jcr.DbRuntimePassword: "<replace-db-password>"
+      jcr.DBA.DbUser: "<replace-db-user>"
+      jcr.DBA.DbPassword: "<replace-db-password>"
+      jcr.DbConfigRoleName: "WP_JCR_CONFIG_USERS"
+      jcr.DbRuntimeRoleName: "WP_JCR_RUNTIME_USERS"
+      jcr.XDbName: "WPJCR"
+      jcr.DbNode: "wpsNode"
+    # Provide a custom secret that will be used to set the DB Type properties
+    # Please make sure that the secret uses the following key: dx_dbtype.properties
+    # If customDbTypePropertiesSecret is provided then all dbTypeProperties values are ignored
+    customDbTypePropertiesSecret: ""
+    dbTypeProperties:
+      oracle.DbDriver: "oracle.jdbc.driver.OracleDriver"
+      oracle.DbLibrary: "/opt/openliberty/wlp/usr/svrcfg/templates/jars/oracle/ojdbc11.jar:/opt/openliberty/wlp/usr/svrcfg/templates/jars/oracle/xdb6-11.2.0.4.jar"
+      oracle.JdbcProviderName: "wpdbJDBC_oracle"
+      derby.DbDriver: "org.apache.derby.jdbc.EmbeddedDriver"
+      derby.DbLibrary: "/opt/HCL/AppServer/derby/lib/derby.jar"
+      derby.JdbcProviderName: "wpdbJDBC_derby"
+      db2.DbDriver: "com.ibm.db2.jcc.DB2Driver"
+      db2.DbLibrary: "/opt/openliberty/wlp/usr/svrcfg/templates/jars/db2/db2jcc4.jar"
+      db2.JdbcProviderName: "wpdbJDBC_db2"
+      sqlserver.DbDriver: com.microsoft.sqlserver.jdbc.SQLServerDriver
+      sqlserver.DbLibrary: /opt/openliberty/wlp/usr/svrcfg/templates/jars/sqlserver/mssql-jdbc.jar
+      sqlserver.JdbcProviderName: wpdbJDBC_sqlserver
+    # Settings for LDAP configuration
+    ldap:
+      # Determines which type of LDAP to use
+      # Accepts: "none", "dx" or "other"
+      # "none" - no LDAP configuration
+      # "dx" - use DX openLDAP and configure it
+      # "other" - use provided configuration for other LDAP
+      type: "none"
+      # User used to connect to LDAP, only used if ldap type is "other"
+      bindUser: ""
+      # Password used to connect to LDAP, only used if ldap type is "other"
+      bindPassword: ""
+      # Provide secret name to be used for LDAP bind credentials
+      # Required attributes:
+      #   - bindUser
+      #   - bindPassword
+      customLdapSecret: ""
+      # Suffix in LDAP, only used if ldap type is "other"
+      suffix: ""
+      # Host of LDAP, only used if ldap type is "other"
+      host: ""
+      # Port of LDAP, only used if ldap type is "other"
+      port:
+      # Supported LDAP Server types - "Custom", "IBM Lotus Domino", "IBM SecureWay Directory Server", "IBM Tivoli Directory Server", "Microsoft Active Directory", "Netscape Directory Server", "Novell eDirectory", "Sun Java System Directory Server"
+      serverType: "Custom"
+      # LDAP configuration id
+      id: "dx_ldap"
+      # Mapping attributes between LDAP and DX, LDAP attribute names (array of elements)
+      attributeMappingLdap:
+        - "mail"
+        - "title"
+        - "userPassword"
+      # Mapping attributes between LDAP and DX, DX attribute names (array of elements)
+      attributeMappingPortal:
+        - "ibm-primaryEmail"
+        - "ibm-jobTitle"
+        - "password"
+      # Non-supported LDAP attributes (array of elements)
+      attributeNonSupported:
+        - "certificate"
+        - "members"
+    # Settings for Transient Users configuration
+    transientUserRegistry:
+      # Indicates if the transient user registry feature is enabled
+      enabled: false
+    # Settings for tuning
+    tuning:
+      # Configures if the environment should be configured for authoring or not
+      authoring: true
+    ltpa:
+      # Pass the name of the LTPA secret to be used for LTPA configuration. The secret should contain the following keys:
+      # - ltpa.keys
+      # - password
+      customLtpaSecret: ""
+    # Defines if the configuration console for the IBM WebSphere Application Server of Core is exposed to the network
+    exposeConfigurationConsole: true
+    # Enable or disable Web Application Bundle (WAB) support
+    wabEnabled: false
+    # Settings for content AI 
+    contentAI:
+      # Configures if content AI is enabled/disabled
+      enabled: false
+      # Settings for checking content AI provider. When contentAI.enabled is true, provider will be used.
+      provider: "OPEN_AI"
+      # Provide the custom AI class which implements com.hcl.workplace.wcm.restv2.ai.IAIGeneration interface in WCM
+      # For e.g. className: "com.ai.sample.CustomerAI"
+      className: ""
+    # Settings for SearchV2 UI configuration
+    search:
+      # Determines if search ui v2 is enabled or not
+      uiV2Enabled: true
+      # Determines to which search center any input box redirects by default
+      inputRedirectVersion: "v2"
+      # Determines which search is used in wcm authoring
+      wcmVersion: "v2"
+    # The keys and values specified in "customSecrets"  must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name', or '123-abc')
+    # Secrets will be injected as environment variables and mounted as files under /mnt/customSecrets 
+    # From there they can be referenced in the server configuration.
+    # All key-value pairs in the specified secrets are injected into the Pod as environment variables
+    # For reference https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#configure-all-key-value-pairs-in-a-secret-as-container-environment-variables
+    # Example secret data:
+    #   DB_USERNAME: "myUser"
+    #   DB_PASSWORD: "myPassword"
+    # 
+    # Example configuration:
+    #
+    # configuration:
+    #   webEngine:
+    #     customSecrets:
+    #       db-credentials: my-custom-db-credentials
+    #
+    # This will make the environment variables DB_USERNAME and DB_PASSWORD available in the Pod.
+    # This will also mount two files in /mnt/customSecrets/db-credentials named "DB_USERNAME" and "DB_PASSWORD"
+    customSecrets: {}
+    # Secrets that include either certificate (.crt) and key (.key) or only a CA certificate.
+    # During startup, the container will populate the keystore with the ID "defaultKeyStore".
+    # 
+    # To create a secret with a key and certificate:
+    # kubectl -n <namespace> create secret tls tls-secret --key="certificate.key" --cert="certificate.crt"
+    #
+    # To create a secret with only a certificate:
+    # kubectl -n <namespace> create secret generic ca-secret --from-file=certificate.ca
+    customKeystoreSecrets: {}
+    customTruststoreSecrets: {}
+# Environment variables for different DX Resources.
+# Type: Array of objects
+# Sample "environment" configuration:
+#   environment:
+#     pod:
+#       haproxy:
+#         - name: KEY1
+#           value: VALUE1
+#         - name: KEY2
+#           value: VALUE2
+environment:
+  # Pod environment variables for DX Resources
+  # WARNING: This environment variable only applies to Pod's main container and will not apply to other containers of the Pod (i.e., logging sidecar, prereqs checker).
+  pod:
+    webEngine: []
+# Allows to start a Pod and its containers in maintenance mode.
+# Pods will not perform a regular execute of the application but will remain idle
+# This allows for debugging inside the containers if required, e.g. if configuration fixes are required
+maintenanceMode:
+  webEngine: false
+# Configuration for the peopleservice sub-chart.
+# Set `enabled` to `true` to enable the peopleservice sub-chart, or `false` to disable it.
+peopleservice:
+  enabled: false
+  # Application configuration
+  configuration:
+    # Specifies whether you are running in production mode or not
+    production: true
+    # Authentication strategy. Accepted values are `OIDC`, `DX`, and `none`
+    authStrategy: "DX"
+    # Integration configuration
+    integration:
+      # Indicates if DX integration is enabled
+      dx: true
+    # Integration specific configuration for DX
+    dx:
+      # Authetnication session cookie name
+      sessionCookieName: "JSESSIONID"
+      # User validation endpoint that confirms if the user is still authenticated
+      userValidationEndpoint: "/auth/validate"
+      # Current user access endpoint that identifies the current user's access level information. 
+      # This information is used to determine the user's role. 
+      # Accepted values are `Privileged`, `Authenticated`, or `Unauthenticated`
+      currentUserAccessEndpoint: "/dxmyrest/access/current-user?resourceId=wps.USERS"
+      # List of privileged roles separated by commas
+      userAccessPrivilegedRoles: "Administrator,Privileged User,Editor"
+      # Context root for the People Service portlet page
+      portletPageContextRoot: "/wps/myportal/Practitioner/PeopleService"
+    # Search configuration
+    search:
+      # Search middleware configuration. This configuration is ignore in case People Service is running in DX integration mode. In DX integration mode, the configuration is picked from DX Core/Webengine configmaps.
+      middleware:
+        # Enable/Disable Search Middleware.
+        enabled: false
+      # Open search middleware content source Id for People Service.
+      contentSourceId: ""
+  # Networking configuration
+  networking:
+    # SSL configuration for the application
+    ssl:
+      # Indicates if the application is accessible on http or https
+      enabled: true
+    # Public qualified host name. For example: "example.com". If `networking.ssl.enabled` is `true`, this key will be prefixed with `https://`, and `http://` if `false`
+    host: ""
+    # Context root for the API and UI
+    contextRoot:
+      # Context root for the API
+      api: "/dx/api/people/v1"
+      # Context root for the UI
+      # @section -- Networking configuration
+      ui: "/dx/ui/people"
+# Global configurations
+# This configuration is only relevant for the SoFy deployments.
+global:
+  serviceAccountName: ""
+  hclImagePullSecret:
+  hclImageRegistry: "hclcr.io/sofy"
+  persistence:
+    rwxStorageClassV3:

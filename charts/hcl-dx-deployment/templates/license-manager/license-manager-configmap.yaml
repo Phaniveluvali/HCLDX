@@ -1,0 +1,28 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: ConfigMap
+# For Service: License Manager
+
+{{- if eq (include "hcl-dx-deployment.licenseManagerEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "ConfigMap"
+metadata:
+  name: "{{ .Release.Name }}-license-manager"
+  labels:
+    app: "{{ .Release.Name }}-license-manager"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+data:
+  {{- include "hcl-dx-deployment.licenseManagerConfig" . | nindent 2 }}
+
+{{- end }}

@@ -1,0 +1,39 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Mapping
+# For Service: HAProxy
+
+{{- if eq (include "hcl-dx-deployment.haproxyEnabled" .) "true" }}
+{{- if (eq (include "hcl-dx-deployment.isSofyDeployment" .) "true") }}
+
+apiVersion: "getambassador.io/v2"
+kind: "Mapping"
+metadata:
+  name: "{{ .Release.Name }}-haproxy"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  ambassador_id: [ '{{- include "hcl-dx-deployment.ambassadorID" . }}' ]
+  connect_timeout_ms: 1200000
+  idle_timeout_ms: 1200000
+  prefix: "/"
+  rewrite: "/"
+  service: {{ printf "%s-haproxy:%s" (.Release.Name) (include "hcl-dx-deployment.haproxyServicePort" .) }}
+  timeout_ms: 1200000
+  host: dx\..*
+  case_sensitive: false
+  host_regex: true
+  prefix_regex: false
+  bypass_auth: true
+{{- end }}
+{{- end }}

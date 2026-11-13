@@ -1,0 +1,635 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2026. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+ 
+# This template creates:
+# Resources: StatefulSet incl. Pods and PVC for transaction logs
+# For Service: core
+
+{{- include "hcl-dx-deployment.checkCoreOrWebEngineEnabled" . }}
+{{- include "hcl-dx-deployment.checkWebEngineAndCoreSwitchDuringUpgrade" . -}}
+{{- if eq (include "hcl-dx-deployment.coreEnabled" .) "true" }}
+{{- include "hcl-dx-deployment.isPasswordValidCheck" . }}
+
+apiVersion: "apps/v1"
+kind: "StatefulSet"
+metadata:
+  name: "{{ .Release.Name }}-core"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  {{- if (.Values.scaling.replicas) }}  
+  replicas: {{ .Values.scaling.replicas.core }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-core"
+  serviceName: "{{ .Release.Name }}-core"
+  # Per pod volume claims
+  volumeClaimTemplates:
+    {{- if (.Values.volumes) }}
+    {{- if (.Values.volumes.core) }}
+    {{- if (.Values.volumes.core.tranlog) }}
+    # Transaction log PVC
+    - metadata:
+        name: "tranlog"
+      spec:
+        accessModes: 
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "{{ .Values.volumes.core.tranlog.requests.storage }}"
+        storageClassName:  "{{ .Values.volumes.core.tranlog.storageClassName }}"
+        {{ if .Values.volumes.core.tranlog.selector }}
+        selector: {{- toYaml (.Values.volumes.core.tranlog.selector) | nindent 10 }}
+        {{ end }}
+        {{ if .Values.volumes.core.tranlog.volumeName }}
+        volumeName: "{{ .Values.volumes.core.tranlog.volumeName }}"
+        {{ end }}
+    {{- end }}
+    {{- if (.Values.volumes.core.log) }}
+    # Application log PVC
+    - metadata:
+        name: "log"
+      spec:
+        accessModes: 
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "{{ .Values.volumes.core.log.requests.storage }}"
+        storageClassName:  "{{ .Values.volumes.core.log.storageClassName }}"
+        {{ if .Values.volumes.core.log.selector }}
+        selector: {{- toYaml (.Values.volumes.core.log.selector) | nindent 10 }}
+        {{ end }}
+        {{ if .Values.volumes.core.log.volumeName }}
+        volumeName: "{{ .Values.volumes.core.log.volumeName }}"
+        {{ end }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+  template:
+    metadata:
+      annotations:
+      {{- if (.Values.annotations.pod.core) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.core }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config-core: "{{- include "hcl-dx-deployment.coreConfig" . | sha256sum }}"
+        checksum/ltpa: "{{- include "hcl-dx-deployment.ltpaChecksum" . }}"
+        checksum/credentials-core: "{{- include "hcl-dx-deployment.coreCredentialsChecksum" . }}"
+        checksum/credentials-configWizard: "{{- include "hcl-dx-deployment.configWizardCredentialsChecksum" . }}"
+        {{- if and (.Values.metrics.core.scrape) (eq (.Values.metrics.core.prometheusDiscoveryType) "annotation") }}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "{{ include "hcl-dx-deployment.ports.core.wasAdmin" . }}"
+        {{- end }}
+      labels:
+      {{- if (.Values.labels.pod.core) }}
+      {{- range $customLabelValue := .Values.labels.pod.core }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-core"
+            # Using general labels, see _deployment_helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.core)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.core) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.core)}}
+      affinity:
+        {{- toYaml (.Values.affinity.core) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.core)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.core) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.core)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.core) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.core)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.core) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.core)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.core) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      # Core termination grace period
+      # Allows core to stop all JVMs
+      terminationGracePeriodSeconds: 180
+      securityContext:
+        fsGroup: 1001
+        runAsUser: 1000
+        runAsGroup: 1001
+        runAsNonRoot: true
+        supplementalGroups:
+        - 1001
+      containers:
+        - name: "core"
+          # Build the image attribute by using the repository and image tag
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.core }}:{{ .Values.images.tags.core }}"
+          # Adjust the image pull policy based on the Chart value
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          # Environment parameters
+          env:
+          {{- if (.Values.environment.pod.core) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.core }} 
+            - name: {{ $customEnvironmentValue.name }}
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "CONFIG_CHECKSUM"
+              value: "{{ include "hcl-dx-deployment.coreConfig" . | sha256sum }}"
+            - name: "LTPA_CHECKSUM"
+              value: "{{- include "hcl-dx-deployment.ltpaChecksum" . }}"
+            - name: "CREDENTIALS_CHECKSUM"
+              value: "{{- include "hcl-dx-deployment.coreCredentialsChecksum" . }}"
+            - name: "CONFIGWIZARD_CREDENTIALS_CHECKSUM"
+              value: "{{- include "hcl-dx-deployment.configWizardCredentialsChecksum" . }}"
+            - name: "DX_ADMIN"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-core-wps"
+            - name: "DX_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-core-wps"
+            - name: "WAS_ADMIN"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-core-was"
+            - name: "WAS_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-core-was"
+            - name: "WAS_ADMIN_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-core-was-previous-value"
+            - name: "WAS_PASSWORD_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-core-was-previous-value"
+            {{- if .Values.configuration.core.tuning.configWizard }}
+            - name: "CONFIGWIZARD_ADMIN"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-core-configwizard"
+            - name: "CONFIGWIZARD_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-core-configwizard"
+            - name: "CONFIGWIZARD_ADMIN_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-core-configwizard-previous-value"
+            - name: "CONFIGWIZARD_PASSWORD_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-core-configwizard-previous-value"
+            {{- end }}
+            - name: "AI_ENABLED"
+              value: "{{ .Values.configuration.core.contentAI.enabled }}"
+            # AI API Key configuration
+            {{- if .Values.configuration.core.contentAI.enabled }}
+            - name: "CONTENT_AI_PROVIDER"
+              value: "{{ .Values.configuration.core.contentAI.provider }}"
+            - name: "CONTENT_AI_PROVIDER_API_KEY"
+              valueFrom:
+                secretKeyRef:
+                  key: "apiKey"
+                  name: "{{ .Release.Name }}-core-content-ai"
+            {{- if (eq (.Values.configuration.core.contentAI.provider) "CUSTOM") }}
+            - name: "CUSTOM_AI_CLASSNAME"
+              value: "{{ .Values.configuration.core.contentAI.className }}"
+            {{ end }}
+            {{ end }}
+            # Optional LTPA Secret for LTPA SSO configuration
+            {{- if .Values.configuration.core.ltpa.enabled }}
+            - name: "LTPA_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "ltpa.password"
+                  name: "{{ .Release.Name }}-core-ltpa"
+                  optional: true
+            - name: "LTPA_VERSION"
+              valueFrom:
+                secretKeyRef:
+                  key: "ltpa.version"
+                  name: "{{ .Release.Name }}-core-ltpa"
+                  optional: true
+            - name: "LTPA_REALM"
+              valueFrom:
+                secretKeyRef:
+                  key: "ltpa.realm"
+                  name: "{{ .Release.Name }}-core-ltpa"
+                  optional: true
+            - name: "LTPA_DES_KEY"
+              valueFrom:
+                secretKeyRef:
+                  key: "ltpa.desKey"
+                  name: "{{ .Release.Name }}-core-ltpa"
+                  optional: true
+            - name: "LTPA_PRIVATE_KEY"
+              valueFrom:
+                secretKeyRef:
+                  key: "ltpa.privateKey"
+                  name: "{{ .Release.Name }}-core-ltpa"
+                  optional: true
+            - name: "LTPA_PUBLIC_KEY"
+              valueFrom:
+                secretKeyRef:
+                  key: "ltpa.publicKey"
+                  name: "{{ .Release.Name }}-core-ltpa"
+                  optional: true
+            {{- end }}
+            {{- if eq (include "hcl-dx-deployment.ldapConfigurationEnabled" .) "true" }}
+            # LDAP Bind secret, used to connect to LDAP
+            - name: "LDAP_BIND_USER"
+              valueFrom:
+                secretKeyRef:
+                  key: "bindUser"
+                  name: "{{ .Release.Name }}-core-ldap"
+            - name: "LDAP_BIND_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "bindPassword"
+                  name: "{{ .Release.Name }}-core-ldap"
+            {{- end }}
+            # OpenSearch search middleware enabled or not
+            - name: "CORE_NEWSEARCH_ENABLED"
+              value: "{{ .Values.configuration.searchMiddleware.enabled }}"
+            # Maintenace mode setting
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.core | quote }}
+          # Port exposure configuration
+          ports:
+            - name: "dx-home"
+              containerPort: {{ include "hcl-dx-deployment.ports.core.dxHome" . }}
+            - name: "dx-home-sec"
+              containerPort: {{ include "hcl-dx-deployment.ports.core.dxHomeSecure" . }}
+            - name: "was-admin"
+              containerPort: {{ include "hcl-dx-deployment.ports.core.wasAdmin" . }}
+            - name: "was-admin-sec"
+              containerPort: {{ include "hcl-dx-deployment.ports.core.wasAdminSecure" . }}
+            - name: "was-soap"
+              containerPort: {{ include "hcl-dx-deployment.ports.core.wasSoap" . }}
+            - name: "cw-home"
+              containerPort: {{ include "hcl-dx-deployment.ports.core.cwHome" . }}
+            - name: "cw-home-sec"
+              containerPort: {{ include "hcl-dx-deployment.ports.core.cwHomeSecure" . }}
+            - name: "bootstrap"
+              containerPort: {{ include "hcl-dx-deployment.ports.core.bootstrap" . }}
+            - name: "cw-admin-sec"
+              containerPort: {{ include "hcl-dx-deployment.ports.core.cwAdminSec" . }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.core) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+          {{- with .Values.probes.core.livenessProbe }}
+            exec:
+              command:
+              - /bin/sh
+              - /opt/app/entrypoints/liveness.sh
+              - "{{ default "/ibm/console" .customProbeURL }}"
+            failureThreshold: {{ .failureThreshold }}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+            successThreshold: {{ .successThreshold }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+          {{- end }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.core) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+          {{- with .Values.probes.core.readinessProbe }}
+            exec:
+              command:
+              - /bin/sh
+              - /opt/app/entrypoints/readiness.sh
+              - {{ default (include "hcl-dx-deployment.coreProbePath" $) .customProbeURL }}
+            failureThreshold: {{ .failureThreshold }}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+            successThreshold: {{ .successThreshold }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+          {{- end }}
+          {{- end }}
+          # Startup probe
+          startupProbe:
+          {{- if (.Values.maintenanceMode.core) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+          {{- with .Values.probes.core.startupProbe }}
+            exec:
+              command:
+              - /bin/sh
+              - /opt/app/entrypoints/readiness.sh
+              - {{ default (include "hcl-dx-deployment.coreProbePath" $) .customProbeURL }}
+            failureThreshold: {{ .failureThreshold }}
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+            successThreshold: {{ .successThreshold }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+          {{- end }}
+          {{- end }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.core.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.core.requests.cpu }}"
+              memory: "{{ .Values.resources.core.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.core.limits) }}
+            limits:
+              {{- if (.Values.resources.core.limits.cpu) }}
+              cpu: "{{ .Values.resources.core.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.core.limits.memory) }}
+              memory: "{{ .Values.resources.core.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "tranlog"
+            mountPath: "/opt/HCL/tranlog"
+          - name: "log"
+            mountPath: "/opt/HCL/logs"
+          - name: "profile"
+            mountPath: "/opt/HCL/profiles"
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+          {{- range $customPVC := .Values.volumes.core.customPVCs }}
+          - name: "custom-{{ $customPVC.name }}"
+            mountPath: "{{ $customPVC.mountPath }}"
+          {{- end }}
+          {{- if $.Values.incubator.consumeSharedConfigs }}
+          {{- range $sharedConfig := $.Values.incubator.consumeSharedConfigs }}
+          {{- $minVer := int $sharedConfig.minVersion }}
+          {{- $maxVer := int $sharedConfig.maxVersion }}
+          {{- range $ver := untilStep (int $minVer) (int (add $maxVer 1)) 1 }}
+          # Optional volume mount for shared config from co-deployed products (LEAP, MX, etc.)
+          # Mounting v{{ $ver }} in range v{{ $minVer }} to v{{ $maxVer }}
+          - name: "{{ $sharedConfig.name }}-v{{ $ver }}"
+            mountPath: "/mnt/shared-config/{{ $sharedConfig.name }}-v{{ $ver }}"
+            readOnly: true
+          {{- end }}
+          {{- end }}
+          {{- end }}
+        # Default logging sidecar containers 
+        - name: "system-out-log"
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.loggingSidecar }}:{{ .Values.images.tags.loggingSidecar }}"
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          env:
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.core | quote }}
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '/var/logs/WebSphere_Portal/SystemOut.log'"]
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.loggingSidecar.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.loggingSidecar.requests.cpu }}"
+              memory: "{{ .Values.resources.loggingSidecar.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.loggingSidecar.limits) }}
+            limits:
+              {{- if .Values.resources.loggingSidecar.limits.cpu }}
+              cpu: "{{ .Values.resources.loggingSidecar.limits.cpu }}"
+              {{- end }}
+              {{- if .Values.resources.loggingSidecar.limits.memory }}
+              memory: "{{ .Values.resources.loggingSidecar.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "log"
+            mountPath: "/var/logs"
+        - name: "system-err-log"
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.loggingSidecar }}:{{ .Values.images.tags.loggingSidecar }}"
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          env:
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.core | quote }}
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '/var/logs/WebSphere_Portal/SystemErr.log'"]
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.loggingSidecar.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.loggingSidecar.requests.cpu }}"
+              memory: "{{ .Values.resources.loggingSidecar.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.loggingSidecar.limits) }}
+            limits:
+              {{- if (.Values.resources.loggingSidecar.limits.cpu) }}
+              cpu: "{{ .Values.resources.loggingSidecar.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.loggingSidecar.limits.memory) }}
+              memory: "{{ .Values.resources.loggingSidecar.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "log"
+            mountPath: "/var/logs"
+        # Additional custom logging sidecar containers  (dynamically created from values)
+        {{ $repository := include "hcl-dx-deployment.imageRepository" . }}
+        {{ $imageName := .Values.images.names.loggingSidecar }}
+        {{ $imageTag := .Values.images.tags.loggingSidecar }}
+        {{ $pullPolicy := .Values.images.pullPolicy }}
+        {{- range $customLogSidecarContainer := .Values.logging.core.customLogSidecarContainers }}
+        - name: {{ $customLogSidecarContainer.containerName }}
+          image: "{{ $repository }}/{{ $imageName }}:{{ $imageTag }}"
+          imagePullPolicy: "{{ $pullPolicy }}"
+          env:
+          {{- if ($.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ $.Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ $.Values.maintenanceMode.core | quote }}
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '{{ $customLogSidecarContainer.logFilePath }}'"]
+          resources:
+            # Resource requests taken from value settings
+            {{- if ($.Values.resources.loggingSidecar.requests) }}
+            requests:
+              cpu: "{{ $.Values.resources.loggingSidecar.requests.cpu }}"
+              memory: "{{ $.Values.resources.loggingSidecar.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if ($.Values.resources.loggingSidecar.limits) }}
+            limits:
+              {{- if ($.Values.resources.loggingSidecar.limits.cpu) }}
+              cpu: "{{ $.Values.resources.loggingSidecar.limits.cpu }}"
+              {{- end }}
+              {{- if ($.Values.resources.loggingSidecar.limits.memory) }}
+              memory: "{{ $.Values.resources.loggingSidecar.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "log"
+            mountPath: "/var/logs"
+          # We mount this again in /opt/HCL/logs to match the paths in the main container while still being backwards compatible to /var/logs
+          - name: "log"
+            mountPath: "/opt/HCL/logs"
+          {{- range $customPVC := $.Values.volumes.core.customPVCs }}
+          - name: "custom-{{ $customPVC.name }}"
+            mountPath: "{{ $customPVC.mountPath }}"
+          {{- end }}
+        {{- end }}
+        {{- if .Values.configuration.prereqsChecker.enabled }}
+        - name: "prereqs-checker"
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.prereqsChecker }}:{{ .Values.images.tags.prereqsChecker }}"
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          env:
+          - name: "MAINTENANCE_MODE"
+            value: {{ .Values.maintenanceMode.core | quote }}
+        {{- if (.Values.configuration.containerTimezone) }}
+          - name: TZ
+            value: {{ .Values.configuration.containerTimezone }}
+        {{- end }}
+          - name: "CHECK_SCHEDULE"
+            value: "{{ .Values.configuration.prereqsChecker.checkSchedule }}"
+          - name: "THRESHOLD_LATENCY_MS"
+            value: "3"
+          - name: "THRESHOLD_RANDOM_READ_IOPS"
+            value: "1800"
+          - name: "THRESHOLD_RANDOM_WRITE_IOPS"
+            value: "600"
+          - name: "THRESHOLD_SPACE_CONSUMED_PERCENT"
+            value: "80"
+          - name: "THRESHOLD_NUM_OF_OLD_PROFILES"
+            value: "5"
+          # Headroom for calculating the space needed for upgrade basing on the current latest profile size. 
+          # This just ensures that we have some leeway in our checks.
+          # We can also use this flexibly if we know that profile would increase by X amount, so that our checks are still accurate. 
+          - name: "HEADROOM_IN_MEBIBYTE"
+            value: "500"
+          - name: "PERFORM_FILE_PERMISSION_CHECK"
+            value: "true"
+          - name: "PERFORM_SOFTLINK_HARDLINK_CHECK"
+            value: "true"
+          - name: "TRANLOG_CAPACITY"
+            value: "{{ .Values.volumes.core.tranlog.requests.storage }}"
+          - name: "LOGS_CAPACITY"
+            value: "{{ .Values.volumes.core.log.requests.storage }}"
+          - name: "PROFILES_CAPACITY"
+            value: "{{ .Values.volumes.core.profile.requests.storage }}"
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.prereqsChecker.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.prereqsChecker.requests.cpu }}"
+              memory: "{{ .Values.resources.prereqsChecker.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.prereqsChecker.limits) }}
+            limits:
+              {{- if (.Values.resources.prereqsChecker.limits.cpu) }}
+              cpu: "{{ .Values.resources.prereqsChecker.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.prereqsChecker.limits.memory) }}
+              memory: "{{ .Values.resources.prereqsChecker.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "tranlog"
+            mountPath: "/mnt/prereqs-checks-volumes/tranlog"
+          - name: "log"
+            mountPath: "/mnt/prereqs-checks-volumes/logs"
+          - name: "profile"
+            mountPath: "/mnt/prereqs-checks-volumes/profiles"
+        {{- end }}
+      volumes:
+      - name: "profile"
+        persistentVolumeClaim:
+          claimName: "{{ .Release.Name }}-core-profile"
+      - name: "config"
+        configMap:
+          name: "{{ .Release.Name }}-core"
+      - name: "global-config"
+        configMap:
+          name: "{{ .Release.Name }}-global"
+      {{- range $customPVC := .Values.volumes.core.customPVCs }}
+      - name: "custom-{{ $customPVC.name }}"
+        persistentVolumeClaim:
+          claimName: "{{ $.Release.Name }}-core-custom-{{ $customPVC.name }}"
+      {{- end }}
+      {{- if .Values.incubator.consumeSharedConfigs }}
+      {{- range $sharedConfig := .Values.incubator.consumeSharedConfigs }}
+      {{- $minVer := int $sharedConfig.minVersion }}
+      {{- $maxVer := int $sharedConfig.maxVersion }}
+      {{- range $ver := untilStep (int $minVer) (int (add $maxVer 1)) 1 }}
+      # Optional volume mount for shared config from co-deployed products (LEAP, MX, etc.)
+      # Mounting v{{ $ver }} in range v{{ $minVer }} to v{{ $maxVer }}
+      - name: "{{ $sharedConfig.name }}-v{{ $ver }}"
+        secret:
+          secretName: "{{ $sharedConfig.name }}-v{{ $ver }}"
+          optional: true
+      {{- end }}
+      {{- end }}
+      {{- end }}
+{{- end }}

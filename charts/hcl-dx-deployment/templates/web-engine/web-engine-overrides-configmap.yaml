@@ -1,0 +1,114 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024, 2025. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: ConfigMap
+# For Service: WebEngine
+
+{{- if eq (include "hcl-dx-deployment.webEngineEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "ConfigMap"
+metadata:
+  name: "{{ .Release.Name }}-web-engine-overrides"
+  labels:
+    app: "{{ .Release.Name }}-web-engine"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+data:
+  {{- if eq (include "hcl-dx-deployment.ldapWebEngineConfigurationEnabled" .) "true" }}
+  ldap-config.xml: |
+{{ include "hcl-dx-deployment.ldapConfig" . | indent 4 }}
+  {{- end }}
+
+  {{- if .Values.configuration.webEngine.ltpa.customLtpaSecret }}
+  ltpa-config.xml: |
+    <server description="DX Web Engine server">
+      <ltpa keysPassword="${LTPA_PASSWORD}" keysFileName="/mnt/ltpa/ltpa.keys" />,
+    </server>
+  {{- end }}
+
+  {{- if .Values.configuration.webEngine.wabEnabled }}
+  wab-config.xml: |
+    <server description="DX Web Engine server">
+      <enterpriseApplication id="wp.vwat.servlet.ear" location="${server.config.dir}/resources/portlets/VwatReverseProxyServlet.ear" name="wp.vwat.servlet.ear" startAfterRef="engine-ear">
+        <web-ext moduleName="wp.vwat.servlet.war" context-root="/"></web-ext>
+        <application-bnd>
+            <security-role name="All Role">
+                <special-subject type="ALL_AUTHENTICATED_USERS"/>
+            </security-role>
+        </application-bnd>
+      </enterpriseApplication>
+    </server>
+  {{- end }}
+
+{{- if and (or .Values.configuration.webEngine.customKeystoreSecrets .Values.configuration.webEngine.customTruststoreSecrets) (kindIs "map" .Values.secrets) }}
+  webEngine-keystores.xml: |
+    <server description="DX Web Engine server">
+    
+      {{- /* Process Keystore Secrets */}}
+      {{- range $key, $secretName := .Values.configuration.webEngine.customKeystoreSecrets }}
+        {{- if hasKey $.Values.secrets $secretName }}
+          {{- $secret := index $.Values.secrets $secretName }}
+
+          {{- $hasKeystore := false }}
+
+          {{- range $fileName := keys $secret }}
+            {{- if or (hasSuffix ".crt" $fileName) (hasSuffix ".key" $fileName) }}
+              {{- $hasKeystore = true }}
+            {{- end }}
+          {{- end }}
+
+          {{- if $hasKeystore }}
+            <include location="${server.config.dir}/configDropins/keystoreOverrides/customKeyStore.xml"/>
+          {{- end }}
+        {{- end }}
+      {{- end }}
+
+      {{- /* Process Truststore Secrets */}}
+      {{- range $key, $secretName := .Values.configuration.webEngine.customTruststoreSecrets }}
+        {{- if hasKey $.Values.secrets $secretName }}
+          {{- $secret := index $.Values.secrets $secretName }}
+
+          {{- $hasTruststore := false }}
+
+          {{- range $fileName := keys $secret }}
+            {{- if or (hasSuffix ".crt" $fileName) (hasSuffix ".ca" $fileName) (hasSuffix ".cer" $fileName) (hasSuffix ".pem" $fileName) }}
+              {{- $hasTruststore = true }}
+            {{- end }}
+          {{- end }}
+
+          {{- if $hasTruststore }}
+            <include location="${server.config.dir}/configDropins/keystoreOverrides/customTrustStore.xml"/>
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    </server>
+{{- end }}
+
+  {{- if .Values.configuration.webEngine.transientUserRegistry.enabled }}
+  transient-user-registry.xml: |
+    <server description="DX Web Engine server">
+      <featureManager>
+        <feature>transientUserRegistry</feature>
+      </featureManager>
+    </server>
+  {{- end }}
+
+# DO NOT CHANGE THE INDENTATION BELOW
+  {{- if .Values.configuration.webEngine.configOverrideFiles -}}
+  {{- range $name, $config := .Values.configuration.webEngine.configOverrideFiles }}
+  # We make sure that the file is always mounted as .xml. Otherwise it is not picked up by Web Engine server
+  {{ trimSuffix ".xml" $name }}.xml: |
+{{ tpl $config $ | indent 4 }}
+  {{- end }}
+  {{- end }}
+
+{{- end }}

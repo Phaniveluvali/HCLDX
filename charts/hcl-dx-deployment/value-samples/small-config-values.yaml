@@ -1,0 +1,36 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2023. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Small config values for hcl-dx-deployment.
+resources:
+  # Core resource allocation
+  core:
+    requests:
+      cpu: "3000m"
+      memory: "5000Mi"
+    limits:
+      cpu: "3000m"
+      memory: "5000Mi"
+  # Ring API resource allocation
+  ringApi:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  # HAProxy resource allocation
+  haproxy:
+    requests:
+      cpu: "700m"
+      memory: "1024Mi"
+    limits:
+      cpu: "700m"
+      memory: "1024Mi"

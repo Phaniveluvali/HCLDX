@@ -1,0 +1,200 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022, 2024. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Deployment incl. Pods
+# For Service: DAM Kaltura Plugin
+
+{{- if eq (include "hcl-dx-deployment.damPluginKalturaEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "{{ .Release.Name }}-dam-plugin-kaltura"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  {{- if (.Values.scaling) }}
+  {{- if (.Values.scaling.replicas) }}
+  replicas: {{ .Values.scaling.replicas.damPluginKaltura }}
+  {{- end }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-dam-plugin-kaltura"
+  template:
+    metadata:
+      annotations: 
+      {{- if (.Values.annotations.pod.damPluginKaltura) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.damPluginKaltura }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config-dam-plugin-kaltura: "{{- include "hcl-dx-deployment.damPluginKalturaConfig" . | sha256sum }}"
+        checksum/auth-secret-dam-plugin-kaltura: {{ .Values.security.damPluginKaltura.authenticationKey | sha256sum }}
+        {{- if and (.Values.metrics.damPluginKaltura.scrape) (eq (.Values.metrics.damPluginKaltura.prometheusDiscoveryType) "annotation") }}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/probe/metrics"
+        prometheus.io/port: "{{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}"
+        {{- end }}
+      labels:
+      {{- if (.Values.labels.pod.damPluginKaltura) }}
+      {{- range $customLabelValue := .Values.labels.pod.damPluginKaltura }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-dam-plugin-kaltura"
+        # Using general labels, see _helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.damPluginKaltura)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.damPluginKaltura) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.damPluginKaltura)}}
+      affinity:
+        {{- toYaml (.Values.affinity.damPluginKaltura) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.damPluginKaltura)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.damPluginKaltura) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.damPluginKaltura)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.damPluginKaltura) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.damPluginKaltura)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.damPluginKaltura) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.damPluginKaltura)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.damPluginKaltura) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: "dam-plugin-kaltura"
+          # Build the image attribute by using the repository and image tag
+          {{- if (.Values.images.tags) }}
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.damPluginKaltura }}:{{ .Values.images.tags.damPluginKaltura }}"
+          {{- end }}
+          # Adjust the image pull policy based on the CHart value
+          {{- if (.Values.images) }}
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          {{- end }}
+          env:
+          {{- if (.Values.environment.pod.damPluginKaltura) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.damPluginKaltura }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "PORT_v1"
+              value: "{{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}"
+            - name: "PLUGIN_API_AUTH_KEY"
+              valueFrom:
+                secretKeyRef:
+                  key: "authenticationKey"
+                  name: "{{ .Release.Name }}-dam-plugin-kaltura-authentication"
+            - name: "KALTURA_SECRET_KEY"
+              valueFrom:
+                secretKeyRef:
+                  key: "secretKey"
+                  name: "{{ .Release.Name }}-dam-plugin-kaltura-authentication"
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.damPluginKaltura | quote }}
+          # Port exposure configuration
+          ports:
+            - name: "kaltura-plugin"
+              containerPort: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.damPluginKaltura) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/probe/live"
+              port: 3000
+              scheme: "HTTP"
+          {{- with .Values.probes.damPluginKaltura.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.damPluginKaltura) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/probe/ready"
+              port: 3000
+              scheme: "HTTP"
+          {{- with .Values.probes.damPluginKaltura.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if and (.Values.resources) (.Values.resources.damPluginKaltura) }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.damPluginKaltura.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.damPluginKaltura.requests.cpu }}"
+              memory: "{{ .Values.resources.damPluginKaltura.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.damPluginKaltura.limits) }}
+            limits:
+              {{- if (.Values.resources.damPluginKaltura.limits.cpu) }}
+              cpu: "{{ .Values.resources.damPluginKaltura.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.damPluginKaltura.limits.memory) }}
+              memory: "{{ .Values.resources.damPluginKaltura.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+      volumes:
+        - name: "config"
+          configMap:
+            name: "{{ .Release.Name }}-dam-plugin-kaltura"
+        - name: "global-config"
+          configMap:
+            name: "{{ .Release.Name }}-global"
+
+{{- end }}

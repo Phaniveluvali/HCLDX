@@ -1,0 +1,208 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022, 2024. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+{{- if eq (include "hcl-dx-deployment.haproxyEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  name: "{{ .Release.Name }}-haproxy"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.scaling.replicas.haproxy }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-haproxy"
+  template:
+    metadata:
+      annotations:
+        checksum/config-haproxy: "{{- include "hcl-dx-deployment.haproxyConfig" . | sha256sum }}"
+        {{- if and (.Values.metrics.haproxy.scrape) (eq (.Values.metrics.haproxy.prometheusDiscoveryType) "annotation") }}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "{{ include "hcl-dx-deployment.ports.haproxy.metrics" . }}"
+        {{- end }}
+      {{- if (.Values.annotations.pod.haproxy) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.haproxy }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+      labels:
+        app: "{{ .Release.Name }}-haproxy"
+            # Using general labels, see _deployment_helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+      {{- if (.Values.labels.pod.haproxy) }}
+      {{- range $customLabelValue := .Values.labels.pod.haproxy }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.haproxy)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.haproxy) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.haproxy)}}
+      affinity:
+        {{- toYaml (.Values.affinity.haproxy) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.haproxy)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.haproxy) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.haproxy)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.haproxy) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.haproxy)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.haproxy) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.haproxy)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.haproxy) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: "haproxy"
+          # Build the image attribute by using the repository and image tag
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.haproxy }}:{{ .Values.images.tags.haproxy }}"
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.haproxy) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/"
+              port: {{ include "hcl-dx-deployment.ports.haproxy.probe" . }}
+              scheme: "HTTP"
+          {{- with .Values.probes.haproxy.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.haproxy) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/"
+              port: {{ include "hcl-dx-deployment.ports.haproxy.probe" . }}
+              scheme: "HTTP"
+          {{- with .Values.probes.haproxy.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          # Adjust the image pull policy based on the Chart value
+          {{- if (.Values.images) }}
+          imagePullPolicy: {{ .Values.images.pullPolicy }}
+          {{- end }}
+          env:
+          {{- if (.Values.environment.pod.haproxy) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.haproxy }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.haproxy | quote }} 
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.haproxy.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.haproxy.requests.cpu }}"
+              memory: "{{ .Values.resources.haproxy.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.haproxy.limits) }}
+            limits:
+              {{- if (.Values.resources.haproxy.limits.cpu) }}
+              cpu: "{{ .Values.resources.haproxy.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.haproxy.limits.memory) }}
+              memory: "{{ .Values.resources.haproxy.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+            - mountPath: /usr/local/etc/haproxy
+              readOnly: true
+              name: haproxy-conf
+            {{- if (and .Values.networking.haproxy.ssl (ne (include "hcl-dx-deployment.isSofyDeployment" .) "true")) }}
+            - mountPath: /etc/ssl/certs
+              readOnly: true
+              name: haproxy-ssl
+            {{- end }}
+            - mountPath: "/etc/global-config"
+              name: "global-config"
+         # Port exposure configuration
+          ports:
+            - name: "haproxy"
+              containerPort: {{ include "hcl-dx-deployment.ports.haproxy.serverContainerPort" . }}
+            - name: "haproxy-socket"
+              containerPort: {{ include "hcl-dx-deployment.ports.haproxy.socketPort" . }}  
+            {{- if (.Values.configuration.core.tuning.configWizard) }}
+            - name: "cw-admin-sec"
+              containerPort: {{ include "hcl-dx-deployment.ports.core.cwAdminSec" . }}
+            {{ end }} 
+            - name: "metrics"
+              containerPort: {{ include "hcl-dx-deployment.ports.haproxy.metrics" . }}
+            {{ if eq (include "hcl-dx-deployment.remoteSearchEnabled" .) "true" }}
+            {{- if (.Values.configuration.remoteSearch.exposeConfigurationConsole) }}
+            - containerPort: {{ include "hcl-dx-deployment.ports.remoteSearch.wasAdminSecure" . }}
+              name: "rs"
+            {{ end }}
+            {{ end }}
+      volumes:
+        - name: haproxy-conf
+          configMap:
+            name: "{{ .Release.Name }}-haproxy"
+            items:
+              - key: dx.config.haproxy.cfg
+                path: haproxy.cfg
+        {{- if (and .Values.networking.haproxy.ssl (ne (include "hcl-dx-deployment.isSofyDeployment" .) "true")) }}
+        - name: haproxy-ssl
+          secret:
+            secretName: "{{ .Values.networking.tlsCertSecret }}"
+            items:
+              - key: tls.crt
+                path: tls.crt
+              # HAProxy expects the key for the certificate under the same path as <certificate-file-name>.key
+              # Therefore we need this naming for the mount path of the item
+              - key: tls.key
+                path: tls.crt.key
+        {{- end }}
+        - name: "global-config"
+          configMap:
+            name: "{{ .Release.Name }}-global"
+
+{{- end }}

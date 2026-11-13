@@ -1,0 +1,353 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2024. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Statefulset incl. Pods and PVC for binaries
+# For Service: Digital Asset Management
+
+{{- if eq (include "hcl-dx-deployment.digitalAssetManagementEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "StatefulSet"
+metadata:
+  name: "{{ .Release.Name }}-digital-asset-management"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  {{- if (.Values.scaling) }}
+  {{- if (.Values.scaling.replicas) }}  
+  replicas: {{ .Values.scaling.replicas.digitalAssetManagement }}
+  {{- end }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-digital-asset-management"
+  serviceName: "{{ .Release.Name }}-digital-asset-management"
+  template:
+    metadata:
+      annotations: 
+      {{- if (.Values.annotations.pod.digitalAssetManagement) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.digitalAssetManagement }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config-digital-asset-management: "{{- include "hcl-dx-deployment.digitalAssetManagementConfig" . | sha256sum }}"
+        checksum/credentials-search-middleware: "{{- include "hcl-dx-deployment.searchCredentialsChecksum" . }}"
+        checksum/credentials-dam-crud-user: "{{- include "hcl-dx-deployment.damCrudUserCredentialsChecksum" . }}"
+        checksum/credentials-postgres-user: "{{- include "hcl-dx-deployment.dbCredentialsChecksum" . }}"
+        {{- if and (.Values.metrics.digitalAssetManagement.scrape) (eq (.Values.metrics.digitalAssetManagement.prometheusDiscoveryType) "annotation") }}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/probe/metrics"
+        prometheus.io/port: "{{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}"
+        {{- end }}
+      labels:
+      {{- if (.Values.labels.pod.digitalAssetManagement) }}
+      {{- range $customLabelValue := .Values.labels.pod.digitalAssetManagement }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-digital-asset-management"
+            # Using general labels, see _deployment_helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.digitalAssetManagement)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.digitalAssetManagement) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.digitalAssetManagement)}}
+      affinity:
+        {{- toYaml (.Values.affinity.digitalAssetManagement) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.digitalAssetManagement)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.digitalAssetManagement) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.digitalAssetManagement)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.digitalAssetManagement) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.digitalAssetManagement)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.digitalAssetManagement) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.digitalAssetManagement)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.digitalAssetManagement) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      securityContext:
+        fsGroup: 1001
+        runAsUser: 1000
+        runAsGroup: 1001
+        runAsNonRoot: true
+        supplementalGroups:
+        - 1001
+      containers:
+        - name: "digital-asset-management"
+          # Build the image attribute by using the repository and image tag
+          {{- if (.Values.images.tags) }}
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.digitalAssetManagement }}:{{ .Values.images.tags.digitalAssetManagement }}"
+          {{- end }}
+          # Adjust the image pull policy based on the Chart value
+          {{- if (.Values.images) }}
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          {{- end }}
+          env:
+          {{- if (.Values.environment.pod.digitalAssetManagement) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.digitalAssetManagement }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "PORT_v1"
+              value: "{{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}"
+            - name: "SEARCHMIDDLEWARE_PUSHADMIN_CREDENTIALS_CHECKSUM"
+              value: "{{- include "hcl-dx-deployment.searchCredentialsChecksum" . }}"
+            - name: "POSTGRES_DB_USER"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-user"
+            - name: "POSTGRES_DB_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-user"
+            - name: "DAM_CRUD_USER"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-dam-user"
+            - name: "DAM_CRUD_USER_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-dam-user"
+            - name: "DAM_CRUD_USER_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-dam-user-previous-value"
+            - name: "DAM_CRUD_USER_PASSWORD_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-dam-user-previous-value"
+            {{- if eq (include "hcl-dx-deployment.webEngineEnabled" .) "true" }}
+            - name: "DX_ADMIN"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-web-engine-wps"
+            - name: "DX_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-web-engine-wps"
+            {{- else }}
+            - name: "DX_ADMIN"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-core-wps"
+            - name: "DX_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-core-wps"
+            {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.digitalAssetManagement | quote }}
+            # Environment variable for new DB management mode
+            - name: "NEW_DB_MANAGEMENT"
+              value: {{ .Values.configuration.digitalAssetManagement.newDbManagement | quote }}
+            {{- if (.Values.networking.addon.digitalAssetManagement.caTrustSecret) }}
+            - name: NODE_EXTRA_CA_CERTS
+              value: "/etc/ca-trust-cert/customCACert.pem"
+            {{- end }}
+          # Port exposure configuration
+          ports:
+            - name: "dam"
+              containerPort: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.digitalAssetManagement) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/probe/live"
+              port: 3000
+              scheme: "HTTP"
+          {{- with .Values.probes.digitalAssetManagement.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.digitalAssetManagement) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            httpGet:
+              path: "/probe/ready"
+              port: 3000
+              scheme: "HTTP"
+          {{- with .Values.probes.digitalAssetManagement.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if and (.Values.resources) (.Values.resources.digitalAssetManagement) }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.digitalAssetManagement.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.digitalAssetManagement.requests.cpu }}"
+              memory: "{{ .Values.resources.digitalAssetManagement.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.digitalAssetManagement.limits) }}
+            limits:
+              {{- if (.Values.resources.digitalAssetManagement.limits.cpu) }}
+              cpu: "{{ .Values.resources.digitalAssetManagement.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.digitalAssetManagement.limits.memory) }}
+              memory: "{{ .Values.resources.digitalAssetManagement.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+          - name: "binaries"
+            mountPath: "/opt/app/upload"
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+          - name: "staging"
+            mountPath: "/etc/staging-secrets"
+            readOnly: true
+          {{- if eq (include "hcl-dx-deployment.damIndexingEnabled" .) "true" }}
+          - name: "push-admin"
+            mountPath: "/etc/config/push-admin"
+            readOnly: true
+          {{- end}}
+          {{- if (.Values.networking.addon.digitalAssetManagement.caTrustSecret) }}
+          - name: "ca-trust-cert"
+            mountPath: "/etc/ca-trust-cert"
+            readOnly: true
+          {{- end }}
+          {{- if (.Values.configuration.persistence.ssl) }}
+          - name: "pg-ssl-cert"
+            mountPath: "/etc/pg-ssl-cert"
+          {{- end}}
+        {{- if .Values.configuration.prereqsChecker.enabled }}
+        - name: "prereqs-checker"
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.prereqsChecker }}:{{ .Values.images.tags.prereqsChecker }}"
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          env:
+          - name: "CHECK_SCHEDULE"
+            value: "{{ .Values.configuration.prereqsChecker.checkSchedule }}"
+          - name: "THRESHOLD_LATENCY_MS"
+            value: "3"
+          - name: "THRESHOLD_RANDOM_READ_IOPS"
+            value: "1800"
+          - name: "THRESHOLD_RANDOM_WRITE_IOPS"
+            value: "600"
+          - name: "THRESHOLD_SPACE_CONSUMED_PERCENT"
+            value: "80"
+          - name: "PERFORM_FILE_PERMISSION_CHECK"
+            value: "true"
+          - name: "PERFORM_SOFTLINK_HARDLINK_CHECK"
+            value: "true"
+          - name: "BINARIES_CAPACITY"
+            value: "{{ .Values.volumes.digitalAssetManagement.binaries.requests.storage }}"
+        {{- if (.Values.configuration.containerTimezone) }}
+          - name: TZ
+            value: {{ .Values.configuration.containerTimezone }}
+        {{- end }}
+          - name: "MAINTENANCE_MODE"
+            value: {{ .Values.maintenanceMode.digitalAssetManagement | quote }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.prereqsChecker.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.prereqsChecker.requests.cpu }}"
+              memory: "{{ .Values.resources.prereqsChecker.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.prereqsChecker.limits) }}
+            limits:
+              {{- if (.Values.resources.prereqsChecker.limits.cpu) }}
+              cpu: "{{ .Values.resources.prereqsChecker.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.prereqsChecker.limits.memory) }}
+              memory: "{{ .Values.resources.prereqsChecker.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "binaries"
+            mountPath: "/mnt/prereqs-checks-volumes/binaries"
+        {{- end }}
+      volumes:
+      - name: "binaries"
+        persistentVolumeClaim:
+          claimName: "{{ .Release.Name }}-digital-asset-management"
+      - name: "config"
+        configMap:
+          name: "{{ .Release.Name }}-digital-asset-management"
+      - name: "global-config"
+        configMap:
+          name: "{{ .Release.Name }}-global"
+      - name: "staging"
+        secret:
+          secretName: "{{ .Release.Name }}-dam-staging"
+          # dam staging secret is optional and will be created while registering the DAM staging sync
+          optional: true
+      {{- if eq (include "hcl-dx-deployment.damIndexingEnabled" .) "true" }}
+      - name: "push-admin"
+        secret:
+          secretName: "{{ .Release.Name }}-dam-search-middleware-push-admin"
+          optional: true
+      {{- end}}
+      # only mount DAM cert secret if specified in values.yaml
+      {{- if (.Values.networking.addon.digitalAssetManagement.caTrustSecret) }}
+      - name: "ca-trust-cert"
+        secret:
+          secretName: "{{ .Values.networking.addon.digitalAssetManagement.caTrustSecret }}"
+      {{- end }}
+      {{- if (.Values.configuration.persistence.ssl) }}
+      - name: "pg-ssl-cert"
+        secret:
+          secretName: "custom-db-ssl-cert"
+      {{- end}}
+{{- end }}

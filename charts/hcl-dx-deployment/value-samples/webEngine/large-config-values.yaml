@@ -1,0 +1,131 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2025. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# Large config values for hcl-dx-deployment.
+configuration:
+  persistence:
+    # The interval at which the health of the persistenceNode cluster is checked
+    validationSleepTimer: 600
+resources:
+  # WebEngine pod resource allocation
+  webEngine:
+    requests:
+      cpu: "5600m"
+      memory: "8192Mi"
+    limits:
+      cpu: "5600m"
+      memory: "8192Mi"
+  # Ring API resource allocation
+  ringApi:
+    requests:
+      cpu: "500m"
+      memory: "2048Mi"
+    limits:
+      cpu: "500m"
+      memory: "2048Mi"
+  # HAProxy resource allocation
+  haproxy:
+    requests:
+      cpu: "2500m"
+      memory: "2048Mi"
+    limits:
+      cpu: "2500m"
+      memory: "2048Mi"
+  # Image Processor resource allocation
+  imageProcessor:
+    requests:
+      cpu: "200m"
+      memory: "2048Mi"
+    limits:
+      cpu: "200m"
+      memory: "2048Mi"
+  # OpenLDAP resource allocation
+  openLdap:
+    requests:
+      cpu: "300m"
+      memory: "2048Mi"
+    limits:
+      cpu: "300m"
+      memory: "2048Mi"
+  # Persistence Connection Pool resource allocation
+  persistenceConnectionPool:
+    requests:
+      cpu: "700m"
+      memory: "1024Mi"
+    limits:
+      cpu: "700m"
+      memory: "1024Mi"
+  # Persistence Node resource allocation
+  persistenceNode:
+    requests:
+      cpu: "3800m"
+      memory: "2048Mi"
+    limits:
+      cpu: "3800m"
+      memory: "2048Mi"
+  # DAM resource allocation
+  digitalAssetManagement:
+    requests:
+      cpu: "2000m"
+      memory: "4096Mi"
+    limits:
+      cpu: "2000m"
+      memory: "4096Mi"
+  # Content composer resource allocation
+  contentComposer:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+  # Runtime Controller resource allocation
+  runtimeController:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "100m"
+      memory: "256Mi"
+  # Persistence metrics exporter resource allocation
+  persistenceMetricsExporter:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "100m"
+      memory: "128Mi"
+  # Logging Sidecar resource allocation
+  loggingSidecar:
+    requests:
+      cpu: "100m"
+      memory: "64Mi"
+    limits:
+      cpu: "100m"
+      memory: "64Mi"
+  # License Manager resource allocation
+  licenseManager:
+    requests:
+      cpu: "100m"
+      memory: "300Mi"
+    limits:
+      cpu: "100m"
+      memory: "300Mi"
+scaling:
+  replicas:
+    digitalAssetManagement: 4
+    persistenceConnectionPool: 3
+    persistenceNode: 3
+    webEngine: 25
+    contentComposer: 1
+    imageProcessor: 1
+    licenseManager: 1
+    ringApi: 2
+    haproxy: 3

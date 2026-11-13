@@ -1,0 +1,28 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: ConfigMap
+# For Service: Runtime Controller
+
+{{- if eq (include "hcl-dx-deployment.runtimeControllerEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "ConfigMap"
+metadata:
+  name: "{{ .Release.Name }}-runtime-controller"
+  labels:
+    app: "{{ .Release.Name }}-runtime-controller"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+data:
+  {{- include "hcl-dx-deployment.runtimeControllerConfig" . | nindent 2 }}
+
+{{- end }}

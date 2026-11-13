@@ -1,0 +1,9 @@
+configuration:
+  webEngine:
+    configOverrideFiles:
+      registerCaasTheme.xml: |
+        <server description="DX Web Engine server">
+          <!-- This will register the CaaS theme with DX Compose -->
+            <enterpriseApplication id="theme.caas.ear" location="${server.config.dir}/resources/themes/wp.theme.caas-ear.ear" name="theme.caas.ear">
+            </enterpriseApplication>
+          </server>

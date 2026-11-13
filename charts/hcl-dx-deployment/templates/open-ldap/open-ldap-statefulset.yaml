@@ -1,0 +1,252 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2024. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: StatefulSet incl. Pods
+# For Service: open-ldap
+
+{{- if eq (include "hcl-dx-deployment.openLdapEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "StatefulSet"
+metadata:
+  name: "{{ .Release.Name }}-open-ldap"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  # In the current deployment mode, this value is hard coded.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-open-ldap"
+  serviceName: "{{ .Release.Name }}-open-ldap"
+  # Per pod volume claims
+  volumeClaimTemplates:
+    # slapd directory PVC
+    - metadata:
+        name: "slapd"
+      spec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "{{ .Values.volumes.openLdap.slapd.requests.storage }}"
+        storageClassName:  "{{ .Values.volumes.openLdap.slapd.storageClassName }}"
+        {{ if .Values.volumes.openLdap.slapd.selector }}
+        selector: {{- toYaml (.Values.volumes.openLdap.slapd.selector) | nindent 10 }}
+        {{ end }}
+        {{ if .Values.volumes.openLdap.slapd.volumeName }}
+        volumeName: "{{ .Values.volumes.openLdap.slapd.volumeName }}"
+        {{- end -}}
+    # certificate directory PVC
+    - metadata:
+        name: "certificate"
+      spec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "{{ .Values.volumes.openLdap.certificate.requests.storage }}"
+        storageClassName:  "{{ .Values.volumes.openLdap.certificate.storageClassName }}"
+        {{ if .Values.volumes.openLdap.certificate.selector }}
+        selector: {{- toYaml (.Values.volumes.openLdap.certificate.selector) | nindent 10 }}
+        {{ end }}
+        {{ if .Values.volumes.openLdap.certificate.volumeName }}
+        volumeName: "{{ .Values.volumes.openLdap.certificate.volumeName }}"
+        {{ end }}
+    # ldap directory PVC
+    - metadata:
+        name: "ldap"
+      spec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "{{ .Values.volumes.openLdap.ldap.requests.storage }}"
+        storageClassName:  "{{ .Values.volumes.openLdap.ldap.storageClassName }}"
+        {{ if .Values.volumes.openLdap.ldap.selector }}
+        selector: {{- toYaml (.Values.volumes.openLdap.ldap.selector) | nindent 10 }}
+        {{ end }}
+        {{ if .Values.volumes.openLdap.ldap.volumeName }}
+        volumeName: "{{ .Values.volumes.openLdap.ldap.volumeName }}"
+        {{ end }}
+  template:
+    metadata:
+      annotations:
+      {{- if (.Values.annotations.pod.openLdap) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.openLdap }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config-open-ldap: "{{- include "hcl-dx-deployment.openLdapConfig" . | sha256sum }}"
+      labels:
+      {{- if (.Values.labels.pod.openLdap) }}
+      {{- range $customLabelValue := .Values.labels.pod.openLdap }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-open-ldap"
+            # Using general labels, see _helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.openLdap)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.openLdap) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.openLdap)}}
+      affinity:
+        {{- toYaml (.Values.affinity.openLdap) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.openLdap)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.openLdap) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.openLdap)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.openLdap) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.openLdap)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.openLdap) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.openLdap)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.openLdap) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        fsGroup: 1001
+        runAsUser: 1000
+        runAsGroup: 1001
+        runAsNonRoot: true
+        supplementalGroups:
+        - 1001
+      containers:
+        - name: "ldap"
+          # Build the image attribute by using the repository and image tag
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.openLdap }}:{{ .Values.images.tags.openLdap }}"
+          # Adjust the image pull policy based on the Chart value
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          # Environment parameters
+          env:
+          {{- if (.Values.environment.pod.openLdap) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.openLdap }}
+            - name: {{ $customEnvironmentValue.name }}
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: LDAP_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-open-ldap-admin"
+                  key: username
+            - name: LDAP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ .Release.Name }}-open-ldap-admin"
+                  key: password
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.openLdap | quote }} 
+          # Port exposure configuration
+          ports:
+            - name: "openldap-ldap"
+              containerPort: {{ include "hcl-dx-deployment.ports.openldap.ldap" . }}
+            - name: "openldap-ldaps"
+              containerPort: {{ include "hcl-dx-deployment.ports.openldap.ldaps" . }}
+            - name: "openldap-ldapi"
+              containerPort: {{ include "hcl-dx-deployment.ports.openldap.ldapi" . }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.openLdap) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            exec:
+              command:
+                - "pidof"
+                - "slapd"
+          {{- with .Values.probes.openLdap.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.openLdap) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            exec:
+              command:
+                - "pidof"
+                - "slapd"
+          {{- with .Values.probes.openLdap.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.openLdap.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.openLdap.requests.cpu }}"
+              memory: "{{ .Values.resources.openLdap.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.openLdap.limits) }}
+            limits:
+              {{- if (.Values.resources.openLdap.limits.cpu) }}
+              cpu: "{{ .Values.resources.openLdap.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.openLdap.limits.memory) }}
+              memory: "{{ .Values.resources.openLdap.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "slapd"
+            mountPath: "/var/dx-openldap/etc/openldap/slapd.d"
+          - name: "ldap"
+            mountPath: "/var/dx-openldap/ldap"
+          - name: "certificate"
+            mountPath: "/var/dx-openldap/certs"
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+      volumes:
+        - name: "config"
+          configMap:
+            name: "{{ .Release.Name }}-open-ldap"
+        - name: "global-config"
+          configMap:
+            name: "{{ .Release.Name }}-global"
+{{- end }}

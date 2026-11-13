@@ -1,0 +1,33 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: ServiceMonitor
+# For Service: image-processor
+
+{{- if and (eq (include "hcl-dx-deployment.imageProcessorEnabled" .) "true") (.Values.metrics.imageProcessor.scrape) (eq (.Values.metrics.imageProcessor.prometheusDiscoveryType) "serviceMonitor")}}
+
+apiVersion: "monitoring.coreos.com/v1"
+kind: "ServiceMonitor"
+metadata:
+  name: "{{ .Release.Name }}-image-processor"
+  labels:
+    app: "{{ .Release.Name }}-image-processor"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-image-processor"
+  endpoints:
+    - targetPort: {{ include "hcl-dx-deployment.ports.global.nodeApplication" . }}
+      path: /probe/metrics
+
+{{- end }}

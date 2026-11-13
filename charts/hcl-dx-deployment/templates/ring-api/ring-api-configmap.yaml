@@ -1,0 +1,28 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: ConfigMap
+# For Service: RingAPI
+
+{{- if eq (include "hcl-dx-deployment.ringApiEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "ConfigMap"
+metadata:
+  name: "{{ .Release.Name }}-ring-api"
+  labels:
+    app: "{{ .Release.Name }}-ring-api"
+    # Using general labels, see _helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+data:
+  {{- include "hcl-dx-deployment.ringApiConfig" . | nindent 2 }}
+
+{{- end }}

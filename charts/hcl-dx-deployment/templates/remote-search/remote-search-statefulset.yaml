@@ -1,0 +1,396 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2024. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+ 
+# This template creates:
+# Resources: StatefulSet incl. Pods and PVC for database
+# For Service: remote-search
+
+{{- if eq (include "hcl-dx-deployment.remoteSearchEnabled" .) "true" }}
+
+apiVersion: "apps/v1"
+kind: "StatefulSet"
+metadata:
+  name: "{{ .Release.Name }}-remote-search"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  # In the current deployment mode, this value is hard coded.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-remote-search"
+  serviceName: "{{ .Release.Name }}-remote-search"
+  # Per pod volume claims
+  volumeClaimTemplates:
+    # Remote Search profile PVC
+    - metadata:
+        name: "prsprofile"
+      spec:
+        accessModes: 
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: {{ .Values.volumes.remoteSearch.prsprofile.requests.storage }}
+        storageClassName:  {{ .Values.volumes.remoteSearch.prsprofile.storageClassName }}
+        {{ if .Values.volumes.remoteSearch.prsprofile.selector }}
+        selector: {{- toYaml (.Values.volumes.remoteSearch.prsprofile.selector) | nindent 10 }}
+        {{ end }}
+        {{ if .Values.volumes.remoteSearch.prsprofile.volumeName }} 
+        volumeName: "{{ .Values.volumes.remoteSearch.prsprofile.volumeName }}"
+        {{ end }}
+  template:
+    metadata:
+      annotations: 
+      {{- if (.Values.annotations.pod.remoteSearch) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.remoteSearch }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/config-remote-search: "{{- include "hcl-dx-deployment.remoteSearchConfig" . | sha256sum }}"
+        checksum/credentials-core: "{{- include "hcl-dx-deployment.remoteSearchCredentialsChecksum" . }}"
+        {{- if and (.Values.metrics.remoteSearch.scrape) (eq (.Values.metrics.remoteSearch.prometheusDiscoveryType) "annotation") }}
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "{{ include "hcl-dx-deployment.ports.remoteSearch.wasAdmin" . }}"
+        {{- end }}
+      labels:
+      {{- if (.Values.labels.pod.remoteSearch) }}
+      {{- range $customLabelValue := .Values.labels.pod.remoteSearch }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-remote-search"
+            # Using general labels, see _deployment_helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.remoteSearch)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.remoteSearch) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.remoteSearch)}}
+      affinity:
+        {{- toYaml (.Values.affinity.remoteSearch) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.remoteSearch)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.remoteSearch) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.remoteSearch)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.remoteSearch) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.remoteSearch)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.remoteSearch) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.remoteSearch)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.remoteSearch) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        fsGroup: 1001
+        runAsUser: 1000
+        runAsGroup: 1001
+        runAsNonRoot: true
+        supplementalGroups:
+        - 1001
+      containers:
+        - name: "remote-search"
+          # Build the image attribute by using the repository and image tag
+          {{- if (.Values.images.tags) }}
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.remoteSearch }}:{{ .Values.images.tags.remoteSearch }}"
+          # Adjust the image pull policy based on the Chart value
+          {{- end }}
+          {{- if (.Values.images) }}
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          {{- end }}
+          # Environment parameters
+          env:
+          {{- if (.Values.environment.pod.remoteSearch) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.remoteSearch }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "CREDENTIALS_CHECKSUM"
+              value: "{{- include "hcl-dx-deployment.remoteSearchCredentialsChecksum" . }}"
+            - name: "WAS_ADMIN"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-remote-search-was"
+            - name: "WAS_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-remote-search-was"
+            - name: "WAS_ADMIN_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-remote-search-was-previous-value"
+            - name: "WAS_PASSWORD_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-remote-search-was-previous-value"
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.remoteSearch | quote }} 
+          # Port exposure configuration
+          ports:
+            - name: "was-admin"
+              containerPort: {{ include "hcl-dx-deployment.ports.remoteSearch.wasAdmin" . }}
+            - name: "was-admin-sec"
+              containerPort: {{ include "hcl-dx-deployment.ports.remoteSearch.wasAdminSecure" . }}
+            - name: "boot-port"
+              containerPort: {{ include "hcl-dx-deployment.ports.remoteSearch.boot" . }}
+            - name: "rs-port"
+              containerPort: {{ include "hcl-dx-deployment.ports.remoteSearch.rs" . }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.remoteSearch) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            exec:
+              command:
+              - /bin/sh
+              - /home/dx_user/liveness.sh
+              - /ibm/console
+          {{- with .Values.probes.remoteSearch.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.remoteSearch) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            exec:
+              command:
+              - /bin/sh
+              - /home/dx_user/readiness.sh
+              - /ibm/console
+          {{- with .Values.probes.remoteSearch.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          {{- if and (.Values.resources) (.Values.resources.remoteSearch) }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.remoteSearch.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.remoteSearch.requests.cpu }}"
+              memory: "{{ .Values.resources.remoteSearch.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.remoteSearch.limits) }}
+            limits:
+              {{- if (.Values.resources.remoteSearch.limits.cpu) }}
+              cpu: "{{ .Values.resources.remoteSearch.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.remoteSearch.limits.memory) }}
+              memory: "{{ .Values.resources.remoteSearch.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+          - name: "prsprofile"
+            mountPath: "/opt/HCL/AppServer/profiles/prs_profile/"
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+        # Default logging sidecar containers 
+        - name: "system-out-log"
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.loggingSidecar }}:{{ .Values.images.tags.loggingSidecar }}"
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          env:
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.remoteSearch | quote }} 
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '/var/profile/logs/server1/SystemOut.log'"]
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.loggingSidecar.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.loggingSidecar.requests.cpu }}"
+              memory: "{{ .Values.resources.loggingSidecar.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.loggingSidecar.limits) }}
+            limits:
+              {{- if (.Values.resources.loggingSidecar.limits.cpu) }}
+              cpu: "{{ .Values.resources.loggingSidecar.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.loggingSidecar.limits.memory) }}
+              memory: "{{ .Values.resources.loggingSidecar.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "prsprofile"
+            mountPath: "/var/profile"
+        - name: "system-err-log"
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.loggingSidecar }}:{{ .Values.images.tags.loggingSidecar }}"
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          env:
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.remoteSearch | quote }} 
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '/var/profile/logs/server1/SystemErr.log'"]
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.loggingSidecar.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.loggingSidecar.requests.cpu }}"
+              memory: "{{ .Values.resources.loggingSidecar.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.loggingSidecar.limits) }}
+            limits:
+              {{- if (.Values.resources.loggingSidecar.limits.cpu) }}
+              cpu: "{{ .Values.resources.loggingSidecar.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.loggingSidecar.limits.memory) }}
+              memory: "{{ .Values.resources.loggingSidecar.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "prsprofile"
+            mountPath: "/var/profile"
+        # Additional custom logging sidecar containers  (dynamically created from values)
+        {{ $repository := include "hcl-dx-deployment.imageRepository" . }}
+        {{ $imageName := .Values.images.names.loggingSidecar }}
+        {{ $imageTag := .Values.images.tags.loggingSidecar }}
+        {{ $pullPolicy := .Values.images.pullPolicy }}
+        {{- range $customLogSidecarContainer := .Values.logging.remoteSearch.customLogSidecarContainers }}
+        - name: {{ $customLogSidecarContainer.containerName }}
+          image: "{{ $repository }}/{{ $imageName }}:{{ $imageTag }}"
+          imagePullPolicy: "{{ $pullPolicy }}"
+          env:
+          {{- if ($.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ $.Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ $.Values.maintenanceMode.remoteSearch | quote }} 
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '{{ $customLogSidecarContainer.logFilePath }}'"]
+          resources:
+            # Resource requests taken from value settings
+            {{- if ($.Values.resources.loggingSidecar.requests) }}
+            requests:
+              cpu: "{{ $.Values.resources.loggingSidecar.requests.cpu }}"
+              memory: "{{ $.Values.resources.loggingSidecar.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if ($.Values.resources.loggingSidecar.limits) }}
+            limits:
+              {{- if ($.Values.resources.loggingSidecar.limits.cpu) }}
+              cpu: "{{ $.Values.resources.loggingSidecar.limits.cpu }}"
+              {{- end }}
+              {{- if ($.Values.resources.loggingSidecar.limits.memory) }}
+              memory: "{{ $.Values.resources.loggingSidecar.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "prsprofile"
+            mountPath: "/var/profile"
+        {{- end }}
+        {{- if .Values.configuration.prereqsChecker.enabled }}
+        - name: "prereqs-checker"
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.prereqsChecker }}:{{ .Values.images.tags.prereqsChecker }}"
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          env:
+          {{- if (.Values.configuration.containerTimezone) }}
+          - name: TZ
+            value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+          - name: "CHECK_SCHEDULE"
+            value: "{{ .Values.configuration.prereqsChecker.checkSchedule }}"
+          - name: "THRESHOLD_LATENCY_MS"
+            value: "3"
+          - name: "THRESHOLD_RANDOM_READ_IOPS"
+            value: "1800"
+          - name: "THRESHOLD_RANDOM_WRITE_IOPS"
+            value: "600"
+          - name: "THRESHOLD_SPACE_CONSUMED_PERCENT"
+            value: "80"
+          - name: "PERFORM_FILE_PERMISSION_CHECK"
+            value: "true"
+          - name: "PERFORM_SOFTLINK_HARDLINK_CHECK"
+            value: "true"
+          - name: "PRSPROFILE_CAPACITY"
+            value: "{{ .Values.volumes.remoteSearch.prsprofile.requests.storage }}"
+          - name: "MAINTENANCE_MODE"
+            value: {{ .Values.maintenanceMode.remoteSearch | quote }} 
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.prereqsChecker.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.prereqsChecker.requests.cpu }}"
+              memory: "{{ .Values.resources.prereqsChecker.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.prereqsChecker.limits) }}
+            limits:
+              {{- if (.Values.resources.prereqsChecker.limits.cpu) }}
+              cpu: "{{ .Values.resources.prereqsChecker.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.prereqsChecker.limits.memory) }}
+              memory: "{{ .Values.resources.prereqsChecker.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "prsprofile"
+            mountPath: "/mnt/prereqs-checks-volumes/prsprofile"
+        {{- end }}
+      volumes:
+      - name: "config"
+        configMap:
+          name: "{{ .Release.Name }}-remote-search"
+      - name: "global-config"
+        configMap:
+          name: "{{ .Release.Name }}-global"
+{{- end }}

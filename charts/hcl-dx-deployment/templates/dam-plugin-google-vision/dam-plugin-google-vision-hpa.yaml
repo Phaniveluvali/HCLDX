@@ -1,0 +1,46 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: HorizontalPodAutoscaler
+# For Service: dam-plugin-google-vision
+
+{{- if eq (include "hcl-dx-deployment.damPluginGoogleVisionEnabled" .) "true" }}
+{{- if .Values.scaling.horizontalPodAutoScaler.damPluginGoogleVision.enabled }}
+apiVersion: "autoscaling/v2"
+kind: "HorizontalPodAutoscaler"
+metadata:
+  name: "{{ .Release.Name }}-dam-plugin-google-vision"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: "apps/v1"
+    kind: "Deployment"
+    name: "{{ .Release.Name }}-dam-plugin-google-vision"
+  minReplicas: {{ .Values.scaling.horizontalPodAutoScaler.damPluginGoogleVision.minReplicas }}
+  maxReplicas: {{ .Values.scaling.horizontalPodAutoScaler.damPluginGoogleVision.maxReplicas }}
+  metrics:
+  - type: "Resource"
+    resource:
+      name: "memory"
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.scaling.horizontalPodAutoScaler.damPluginGoogleVision.targetMemoryUtilizationPercentage }}
+  - type: "Resource"
+    resource:
+      name: "cpu"
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.scaling.horizontalPodAutoScaler.damPluginGoogleVision.targetCPUUtilizationPercentage }}
+
+{{- end }}
+{{- end }}

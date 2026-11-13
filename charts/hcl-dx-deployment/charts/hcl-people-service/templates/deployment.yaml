@@ -1,0 +1,248 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+ 
+# This template creates:
+# Resources: Deployment
+# For Service: People Service
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations: 
+  {{- if (.Values.annotations.pod) }}
+  {{- range $customAnnotationValue := .Values.annotations.pod }}
+    {{ $customAnnotationValue.key }}: {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  labels:
+    app: {{ include "hcl-people-service.fullname" . }}
+    {{- include "hcl-people-service.labels" . | nindent 4 }}
+  
+  name: {{ include "hcl-people-service.fullname" . }}
+spec:
+  replicas: {{ .Values.scaling.replicaCount }}
+  revisionHistoryLimit: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {}
+  selector:
+    matchLabels:
+      app: {{ include "hcl-people-service.fullname" . }}
+  template:
+    metadata:
+      name: {{ include "hcl-people-service.fullname" . }}
+      annotations: 
+      {{- if (.Values.annotations.pod) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod }}
+        {{ $customAnnotationValue.key }}: {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        checksum/env-vars-configmap: {{ (printf (include "hcl-people-service.envVars" .) | sha256sum | quote) }}
+        {{- if empty .Values.externalDatabase.existingSecret }}
+        checksum/database-secret: {{ (printf (include "hcl-people-service.databaseConfig" .) | sha256sum | quote) }}
+        {{- end }}
+        {{- if not (empty (include "hcl-people-service.jwtSecretData" .)) }}
+        checksum/jwt-secret: {{ (printf (include "hcl-people-service.jwtSecretData" .) | sha256sum | quote) }}
+        {{- end }}
+        {{- if not (empty (include "hcl-people-service.oidcSecretData" .)) }}
+        checksum/oidc-secret: {{ (printf (include "hcl-people-service.oidcSecretData" .) | sha256sum | quote) }}
+        {{- end }}
+        {{- if not (empty (include "hcl-people-service.ldapSecretData" .)) }}
+        checksum/ldap-secret: {{ (printf (include "hcl-people-service.ldapSecretData" .) | sha256sum | quote) }}
+        {{- end }}
+        {{- if not (empty (include "hcl-people-service.searchMiddlewarePushAdminSecretData" .)) }}
+        checksum/search-middleware-push-admin-secret: {{ (printf (include "hcl-people-service.searchMiddlewarePushAdminSecretData" .) | sha256sum | quote) }}
+        {{- end }}
+      labels:
+        app: {{ include "hcl-people-service.fullname" . }}
+        {{- if (.Values.labels.pod) }}
+        {{- range $customLabelValue := .Values.labels.pod }}
+        {{ $customLabelValue.key }}: {{ $customLabelValue.value | quote }}
+        {{- end }}
+        {{- end }}
+        {{- include "hcl-people-service.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-people-service.serviceAccountName" .)) }}
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-people-service.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector) | nindent 8 }}
+      {{- end }}
+      {{- include "hcl-people-service.imagePullSecret" . | nindent 6}}
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        supplementalGroups:
+        - 1000
+      containers:
+        - name: {{ include "hcl-people-service.fullname" . }}
+          image: {{ include "hcl-people-service.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+          {{- if (.Values.extraEnvVars) }}
+          {{- range $customEnvironmentValue := .Values.extraEnvVars }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            {{- include "hcl-people-service.databaseConfig" . | nindent 12 }}
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hcl-people-service.jwtSecret" . }}
+                  key: {{ include "hcl-people-service.jwtSecretKey" . }}
+          {{- if eq (.Values.configuration.authStrategy | lower) "oidc" }}
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hcl-people-service.oidcSecret" . }}
+                  key: {{ include "hcl-people-service.clientSecretKey" . }}
+          {{- end }}
+          {{- if .Values.ldap.enabled }}
+            - name: LDAP_CONFIG_BIND_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hcl-people-service.ldapSecret" . }}
+                  key: {{ include "hcl-people-service.ldapBindPasswordSecretKey" . }}
+          {{- end }}
+          {{- if eq (include "hcl-people-service.searchMiddlewareEnabled" .) "true" }}
+            - name: SEARCH_MIDDLEWARE_PUSH_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hcl-people-service.searchMiddlewarePushAdminSecretName" . }}
+                  key: username
+            - name: SEARCH_MIDDLEWARE_PUSH_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hcl-people-service.searchMiddlewarePushAdminSecretName" . }}
+                  key: password
+          {{- end }}
+          {{- if or (.Values.logging.sidecar.sync.enabled) (.Values.logging.sidecar.audit.enabled) }}
+            - name: LOGS_DIRECTORY
+              value: {{ .Values.logging.path }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ printf "%s-env-vars-configmap" (include "hcl-people-service.fullname" .) }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPorts.http }}
+              protocol: TCP
+          {{- if .Values.probes.livenessProbe.enabled }}
+          livenessProbe: {{ omit .Values.probes.livenessProbe "enabled" | toYaml | nindent 12 }}
+            httpGet:
+              path: {{ printf "%s/probes/health" .Values.networking.contextRoot.api }}
+              port: http
+              scheme: HTTP
+          {{- end }}
+          {{- if .Values.probes.readinessProbe.enabled }}
+          readinessProbe: {{ omit .Values.probes.readinessProbe "enabled" | toYaml | nindent 12 }}
+            httpGet:
+              path: {{ printf "%s/probes/ready" .Values.networking.contextRoot.api }}
+              port: http
+              scheme: HTTP
+          {{- end }}
+          {{- if (.Values.resources) }}
+          resources:
+            {{- if (.Values.resources.requests) }}
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.resources.requests.memory }}
+            {{- end }}
+            {{- if (.Values.resources.limits) }}
+            limits:
+              cpu: {{ .Values.resources.limits.cpu }}
+              memory: {{ .Values.resources.limits.memory }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+          - name: "people-storage"
+            mountPath: /data/people
+          {{- range $customPVC := .Values.volumes.customPVCs }}
+          - name: "custom-{{ $customPVC.name }}"
+            mountPath: "{{ $customPVC.mountPath }}"
+          {{- end }}
+          {{- if and .Values.configuration.search.middleware.enabled .Values.configuration.integration.dx }}
+          # WebEngine config map
+          - name: "web-engine-config"
+            mountPath: "/etc/config/webEngineConfig"
+            readOnly: true
+          # Core config map
+          - name: "core-config"
+            mountPath: "/etc/config/coreConfig"
+            readOnly: true
+          {{- end }}
+        # Audit logging sidecar container
+        {{- if (.Values.logging.sidecar.audit.enabled) }}
+        - name: {{ include "logging-sidecar.audit.fullname" . }}
+          image: {{ include "logging-sidecar.image" . }}
+          imagePullPolicy: {{ .Values.logging.sidecar.image.pullPolicy }}
+          env:
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.logging.sidecar.maintenanceModeEnabled | quote }}
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '{{ .Values.logging.path }}/audit.log'"]
+          volumeMounts:
+          - name: "people-storage"
+            mountPath: /data/people
+          {{- range $customPVC := .Values.volumes.customPVCs }}
+          - name: "custom-{{ $customPVC.name }}"
+            mountPath: "{{ $customPVC.mountPath }}"
+          {{- end }}
+        {{- end }}
+        # Sync logging sidecar container
+        {{- if (.Values.logging.sidecar.sync.enabled) }}
+        - name: {{ include "logging-sidecar.sync.fullname" . }}
+          image: {{ include "logging-sidecar.image" . }}
+          imagePullPolicy: {{ .Values.logging.sidecar.image.pullPolicy }}
+          env:
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.logging.sidecar.maintenanceModeEnabled | quote }}
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '{{ .Values.logging.path }}/sync.log'"]
+          volumeMounts:
+          - name: "people-storage"
+            mountPath: /data/people
+          {{- range $customPVC := .Values.volumes.customPVCs }}
+          - name: "custom-{{ $customPVC.name }}"
+            mountPath: "{{ $customPVC.mountPath }}"
+          {{- end }}
+        {{- end }}
+      {{- $root := . }}
+      volumes:
+      - name: people-storage
+        persistentVolumeClaim:
+          claimName: {{ printf "%s-data" (include "hcl-people-service.fullname" .) }}
+      {{- range $customPVC := .Values.volumes.customPVCs }}
+      - name: "custom-{{ $customPVC.name }}"
+        persistentVolumeClaim:
+          claimName: {{ printf "%s-custom-%s" (include "hcl-people-service.pvcName" $root) $customPVC.name }}
+      {{- end }}
+      {{- if and .Values.configuration.search.middleware.enabled .Values.configuration.integration.dx }}
+      # WebEngine config map
+      - name: "web-engine-config"
+        configMap:
+          name: "{{ .Release.Name }}-web-engine"
+          optional: true
+      # Core config map
+      - name: "core-config"
+        configMap:
+          name: "{{ .Release.Name }}-core"
+          optional: true
+      {{- end }}

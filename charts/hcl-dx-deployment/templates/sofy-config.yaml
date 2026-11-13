@@ -1,0 +1,377 @@
+#*
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2025. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+#*
+
+{{- if .Values.global.sofySolution }}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hcl-dx-deployment.name" . }}-sofy-config
+  labels:
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+data:
+  sofy-config.json: |-
+    {{- if .Values.applications.core }}
+    {
+        "name": "{{ .Chart.Name }}",
+        "description": "{{ .Chart.Description }}",
+        "version": "{{ .Chart.Version }}",
+        "displayName": "HCL Digital Experience",
+        "buildOptions": {
+            "dev": {
+                "useEmissary": true
+            }
+        },
+        "links": [
+            {
+                "displayName": "Access Control API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/access/v1/explorer"
+            },
+            {{- if .Values.applications.ringApi }}
+            {
+                "displayName": "Ring API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/core/v1/explorer"
+            },
+            {{- end }}
+            {{- if .Values.applications.digitalAssetManagement }}
+            {
+                "displayName": "DAM API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/dam/v1/explorer"
+            },
+            {{- end }}
+            {
+                "displayName": "Image Processor API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/image-processor/v1/explorer"
+            },
+            {
+                "displayName": "PZN API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/pzn/v1/explorer"
+            },
+            {
+                "displayName": "Search API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/search/v1/explorer"
+            },
+            {
+                "displayName": "User And Group API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/users/v1/explorer"
+            },
+            {
+                "displayName": "WCM API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/wcm/v2/explorer"
+            },
+            {{- if .Values.applications.ringApi }}
+            {
+                "displayName": "Ring API",
+                "type": "apiroot",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/core/v1/"
+            },
+            {
+                "displayName": "Ring API GraphQL Explorer",
+                "type": "apiroot",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/core/v1/graphql"
+            },
+            {{- end }}
+            {{- if .Values.applications.digitalAssetManagement }}
+            {
+                "displayName": "DAM API",
+                "type": "apiroot",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/dam/v1/"
+            },
+            {
+                "displayName": "DAM API GraphQL Explorer",
+                "type": "apiroot",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/dam/v1/graphql"
+            },
+            {{- end }}
+            {
+                "displayName": "DXConnect/ConfigWizard",
+                "type": "apiroot",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/hcl/wizard/",
+                "credentials": [
+                    {
+                        "displayName": "Default DXConnect/ConfigWizard Admin Login",
+                        "usernameSecret": {
+                            "name": "{{ .Release.Name }}-core-configwizard-sofy",
+                            "key": "username"
+                        },
+                        "passwordSecret": {
+                            "name": "{{ .Release.Name }}-core-configwizard-sofy",
+                            "key": "password"
+                        }
+                    }
+                ]
+            },
+            {
+                "displayName": "Home Page",
+                "type": "ui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/wps/portal",
+                "credentials": [
+                    {
+                        "displayName": "Default Admin Login",
+                        "usernameSecret": {
+                            "name": "{{ .Release.Name }}-core-wps-sofy",
+                            "key": "username"
+                        },
+                        "passwordSecret": {
+                            "name": "{{ .Release.Name }}-core-wps-sofy",
+                            "key": "password"
+                        }
+                    }
+                ]
+            }
+        ],
+        "services": {
+            "dx": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-core": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-content-composer": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-digital-asset-management": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-image-processor": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-open-ldap": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-persistence-headless-svc": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-remote-search": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-ring-api": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-runtime-controller": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            }
+        }
+    }
+    {{- end }}
+    {{- if .Values.applications.webEngine }}
+    {
+        "name": "{{ .Chart.Name }}",
+        "description": "{{ .Chart.Description }}",
+        "version": "{{ .Chart.Version }}",
+        "displayName": "HCL Digital Experience Compose",
+        "buildOptions": {
+            "dev": {
+                "useEmissary": true
+            }
+        },
+        "links": [
+            {
+                "displayName": "Access Control API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/access/v1/explorer"
+            },
+            {{- if .Values.applications.ringApi }}
+            {
+                "displayName": "Ring API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/core/v1/explorer"
+            },
+            {{- end }}
+            {{- if .Values.applications.digitalAssetManagement }}
+            {
+                "displayName": "DAM API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/dam/v1/explorer"
+            },
+            {{- end }}
+            {
+                "displayName": "Image Processor API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/image-processor/v1/explorer"
+            },
+            {
+                "displayName": "PZN API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/pzn/v1/explorer"
+            },
+            {
+                "displayName": "Search API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/search/v2/explorer"
+            },
+            {
+                "displayName": "User And Group API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/users/v1/explorer"
+            },
+            {
+                "displayName": "WCM API Explorer",
+                "type": "openapiui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/wcm/v2/explorer"
+            },
+            {{- if .Values.applications.ringApi }}
+            {
+                "displayName": "Ring API",
+                "type": "apiroot",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/core/v1/"
+            },
+            {
+                "displayName": "Ring API GraphQL Explorer",
+                "type": "apiroot",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/core/v1/graphql"
+            },
+            {{- end }}
+            {{- if .Values.applications.digitalAssetManagement }}
+            {
+                "displayName": "DAM API",
+                "type": "apiroot",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/dam/v1/"
+            },
+            {
+                "displayName": "DAM API GraphQL Explorer",
+                "type": "apiroot",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/dx/api/dam/v1/graphql"
+            },
+            {{- end }}
+            {
+                "displayName": "Home Page",
+                "type": "ui",
+                "static": false,
+                "subdomain": "dx",
+                "path": "/wps/portal",
+                "credentials": [
+                    {
+                        "displayName": "Default Admin Login",
+                        "usernameSecret": {
+                            "name": "{{ .Release.Name }}-web-engine-wps",
+                            "key": "username"
+                        },
+                        "passwordSecret": {
+                            "name": "{{ .Release.Name }}-web-engine-wps",
+                            "key": "password"
+                        }
+                    }
+                ]
+            }
+        ],
+        "services": {
+            "dx": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-content-composer": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-digital-asset-management": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-image-processor": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-open-ldap": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-persistence-headless-svc": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-ring-api": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-runtime-controller": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            },
+            "{{ .Release.Name }}-web-engine": {
+                "disablePublicRoute": "true",
+                "disableAccessControl": "true"
+            }
+        }
+    }
+    {{- end }}
+{{- end }}

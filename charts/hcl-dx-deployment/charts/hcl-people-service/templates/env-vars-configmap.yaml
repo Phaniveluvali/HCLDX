@@ -1,0 +1,23 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: ConfigMap
+# For Service: People Service
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-env-vars-configmap" (include "hcl-people-service.fullname" .) }}
+  labels:
+    app: {{ include "hcl-people-service.fullname" . }}
+    {{- include "hcl-people-service.labels" . | nindent 4 }}
+data:
+  {{- include "hcl-people-service.envVars" . | nindent 2 }}

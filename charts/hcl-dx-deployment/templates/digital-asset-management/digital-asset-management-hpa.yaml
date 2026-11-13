@@ -1,0 +1,46 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: HorizontalPodAutoscaler
+# For Service: digital-asset-management
+
+{{- if eq (include "hcl-dx-deployment.digitalAssetManagementEnabled" .) "true" }}
+{{- if .Values.scaling.horizontalPodAutoScaler.digitalAssetManagement.enabled }}
+apiVersion: "autoscaling/v2"
+kind: "HorizontalPodAutoscaler"
+metadata:
+  name: "{{ .Release.Name }}-digital-asset-management"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: "apps/v1"
+    kind: "StatefulSet"
+    name: "{{ .Release.Name }}-digital-asset-management"
+  minReplicas: {{ .Values.scaling.horizontalPodAutoScaler.digitalAssetManagement.minReplicas }}
+  maxReplicas: {{ .Values.scaling.horizontalPodAutoScaler.digitalAssetManagement.maxReplicas }}
+  metrics:
+  - type: "Resource"
+    resource:
+      name: "memory"
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.scaling.horizontalPodAutoScaler.digitalAssetManagement.targetMemoryUtilizationPercentage }}
+  - type: "Resource"
+    resource:
+      name: "cpu"
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.scaling.horizontalPodAutoScaler.digitalAssetManagement.targetCPUUtilizationPercentage }}
+
+{{- end }}
+{{- end }}

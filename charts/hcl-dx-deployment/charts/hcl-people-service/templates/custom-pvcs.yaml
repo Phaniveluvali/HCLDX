@@ -1,0 +1,47 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: PersistentVolumeClaim
+# For Service: People Service
+
+{{- $root := . }}
+{{- range $customPVC := .Values.volumes.customPVCs }}
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-custom-%s" (include "hcl-people-service.pvcName" $root) $customPVC.name }}
+  annotations:
+  {{- if ($root.Values.annotations.pod) }}
+  {{- range $customAnnotationValue := $root.Values.annotations.pod }}
+    {{ $customAnnotationValue.key }}: {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}  
+  labels:
+    app: {{ include "hcl-people-service.fullname" $root }}
+    {{- include "hcl-people-service.labels" $root | nindent 4 }}
+spec:
+  accessModes:
+    {{- range $accessMode := $customPVC.accessModes }}
+    - "{{ $accessMode }}"
+    {{- end }}
+  resources:
+    requests:
+      storage: "{{ $customPVC.requests.storage }}"
+  storageClassName: "{{ $customPVC.storageClassName }}"
+  {{ if $customPVC.selector }}
+  selector: {{- toYaml ( $customPVC.selector) | nindent 4 }}
+  {{ end }}
+  {{ if $customPVC.volumeName }}
+  volumeName: "{{ $customPVC.volumeName }}"
+  {{ end }}
+---  
+{{- end }}

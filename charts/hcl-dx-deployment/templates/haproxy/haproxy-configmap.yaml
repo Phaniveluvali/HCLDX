@@ -1,0 +1,29 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Configmap
+# For Service: HAProxy
+
+{{- if eq (include "hcl-dx-deployment.haproxyEnabled" .) "true" }}
+{{- include "hcl-dx-deployment.isPreloadValidCheck" . }}
+
+apiVersion: "v1"
+kind: "ConfigMap"
+metadata:
+  name: "{{ .Release.Name }}-haproxy"
+  labels:
+    app: "{{ .Release.Name }}-haproxy"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+data:
+  {{- include "hcl-dx-deployment.haproxyConfig" . | nindent 2 }}
+
+{{- end }}

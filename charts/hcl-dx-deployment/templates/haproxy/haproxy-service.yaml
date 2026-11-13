@@ -1,0 +1,72 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: HAProxy
+
+{{- if eq (include "hcl-dx-deployment.haproxyEnabled" .) "true" }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-haproxy"
+  annotations:
+  {{- if (.Values.annotations.service.haproxy) }}
+  {{- range $customAnnotationValue := .Values.annotations.service.haproxy }}
+    {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+  {{- end }}
+  {{- end }}
+  labels:
+    app: "{{ .Release.Name }}-haproxy"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+  {{- if (.Values.labels.service.haproxy) }}
+  {{- range $customLabelValue := .Values.labels.service.haproxy }}
+    {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+  {{- end }}
+  {{- end }}
+spec:
+  type: "{{- (include "hcl-dx-deployment.haproxyServiceType" .) }}"
+  {{- if eq (include "hcl-dx-deployment.haproxyServiceType" .) "LoadBalancer" }}
+  externalTrafficPolicy: "Local"
+  {{- end }}
+  ports:
+    - name: "haproxy"
+      port: {{ include "hcl-dx-deployment.haproxyServicePort" . }}
+      targetPort: {{ include "hcl-dx-deployment.ports.haproxy.serverContainerPort" . }}
+      # This is a workaround to enable the switch from LoadBalancer (which has a nodePort fields defined) to ClusterIP (which does not allow those fields)
+      {{- if eq (include "hcl-dx-deployment.haproxyServiceType" .) "ClusterIP" }}
+      nodePort: null
+      {{- else if and (eq (include "hcl-dx-deployment.haproxyServiceType" .) "NodePort") (.Values.networking.haproxy.serviceNodePort) }}
+      nodePort: {{ .Values.networking.haproxy.serviceNodePort }}
+      {{- end }}
+    {{ if eq (include "hcl-dx-deployment.remoteSearchEnabled" .) "true" }}
+    {{- if (.Values.configuration.remoteSearch.exposeConfigurationConsole) }}
+    - port: {{ include "hcl-dx-deployment.ports.remoteSearch.wasAdminSecure" . }}
+      name: "rs"
+      # This is a workaround to enable the switch from LoadBalancer (which has a nodePort fields defined) to ClusterIP (which does not allow those fields)
+      {{- if eq (include "hcl-dx-deployment.haproxyServiceType" .) "ClusterIP" }}
+      nodePort: null
+      {{- end }}
+    {{ end }}
+    {{ end }}
+    {{- if (.Values.configuration.core.tuning.configWizard) }}
+    - port: {{ include "hcl-dx-deployment.ports.core.cwAdminSec" . }}
+      name: "cw-admin-sec"
+    {{ end }} 
+    {{- if and (eq (include "hcl-dx-deployment.webEngineEnabled" .) "true") (default false .Values.configuration.webEngine.debug) }} 
+    - name: "web-engine-debug"
+      port: {{ include "hcl-dx-deployment.ports.webEngine.debug" . }}
+    {{ end }} 
+  selector:
+    app: "{{ .Release.Name }}-haproxy"
+
+{{- end }}

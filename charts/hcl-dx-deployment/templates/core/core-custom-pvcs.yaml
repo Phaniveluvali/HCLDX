@@ -1,0 +1,43 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2022. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: PersistentVolumeClaim
+# For Service: Core
+
+{{- if eq (include "hcl-dx-deployment.coreEnabled" .) "true" }}
+
+{{- range $customPVC := .Values.volumes.core.customPVCs }}
+---
+kind: "PersistentVolumeClaim"
+apiVersion: "v1"
+metadata:
+  name: "{{ $.Release.Name }}-core-custom-{{ $customPVC.name }}"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" $ | nindent 4 }}
+spec:
+  accessModes:
+    {{- range $accessMode := $customPVC.accessModes }}
+    - "{{ $accessMode }}"
+    {{- end }}
+  resources:
+    requests:
+      storage: "{{ $customPVC.requests.storage }}"
+  storageClassName: "{{ $customPVC.storageClassName }}"
+  {{ if $customPVC.selector }}
+  selector: {{- toYaml ( $customPVC.selector) | nindent 4 }}
+  {{ end }}
+  {{ if $customPVC.volumeName }}
+  volumeName: "{{ $customPVC.volumeName }}"
+  {{ end }}
+{{- end }}
+
+{{- end }}

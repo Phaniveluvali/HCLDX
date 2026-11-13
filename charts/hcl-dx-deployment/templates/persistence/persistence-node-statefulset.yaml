@@ -1,0 +1,484 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2021, 2024. All Rights Reserved. *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+ 
+# This template creates:
+# Resources: StatefulSet incl. Pods and PVC for database
+# For Service: PG Replication Manager Read Write
+
+{{- if eq (include "hcl-dx-deployment.persistenceEnabled" .) "true" }}
+
+{{- /* Validate IQ database secret only if IQ is enabled */ -}}
+{{- if eq (include "hcl-dx-deployment.iqEnabled" .) "true" }}
+  {{- include "hcl-dx-deployment.validateIqSecret" . -}}
+
+  {{- /* Validate IQ database secret if customDbSecret is provided */ -}}
+  {{- if .Values.incubator.security.iq.customDbSecret }}
+    {{- include "hcl-dx-deployment.checkSecretAndDataExists" (dict "secretName" .Values.incubator.security.iq.customDbSecret "requiredDataAttributes" (list "username" "password") "globalScope" .) }}
+  {{- end }}
+{{- end }}
+
+apiVersion: "apps/v1"
+kind: "StatefulSet"
+metadata:
+  name: "{{ .Release.Name }}-persistence-node"
+  labels:
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  {{- if (.Values.scaling) }}
+  {{- if (.Values.scaling.replicas) }}  
+  replicas: {{ .Values.scaling.replicas.persistenceNode }}
+  {{- end }}
+  {{- end }}
+
+  selector:
+    matchLabels:
+      app: "{{ .Release.Name }}-persistence-node"
+  serviceName: "{{ .Release.Name }}-persistence-headless-svc"
+  # Per pod volume claims
+  volumeClaimTemplates:
+    {{- if (.Values.volumes) }}
+    {{- if (.Values.volumes.persistenceNode) }}
+    {{- if (.Values.volumes.persistenceNode.database) }}
+    # Database PVC
+    - metadata:
+        name: "database"
+      spec:
+        accessModes: 
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: {{ .Values.volumes.persistenceNode.database.requests.storage }}
+        storageClassName:  {{ .Values.volumes.persistenceNode.database.storageClassName }}
+        {{ if .Values.volumes.persistenceNode.database.selector }}
+        selector: {{- toYaml (.Values.volumes.persistenceNode.database.selector) | nindent 10 }}
+        {{ end }}
+        {{ if .Values.volumes.persistenceNode.database.volumeName }}
+        volumeName: "{{ .Values.volumes.persistenceNode.database.volumeName }}-node"
+        {{ end }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+  template:
+    metadata:
+      annotations:
+      {{- if (.Values.annotations.pod.persistenceNode) }}
+      {{- range $customAnnotationValue := .Values.annotations.pod.persistenceNode }}
+        {{ $customAnnotationValue.key }} : {{ $customAnnotationValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        # Checksum annotations are only used in old DB management mode
+        {{- if ne (.Values.configuration.digitalAssetManagement.newDbManagement) true }}
+        checksum/config-persistence-node: "{{- include "hcl-dx-deployment.persistenceNodeConfig" . | sha256sum }}"
+        checksum/custom-secret-db-user: "{{- include "hcl-dx-deployment.dbCredentialsChecksum" . }}"
+        checksum/custom-secret-replication-user: "{{- include "hcl-dx-deployment.replicationUserCredentialsChecksum" . }}"
+        {{- end}}
+        {{- if and (.Values.metrics.persistence.scrape) (eq (.Values.metrics.persistence.prometheusDiscoveryType) "annotation") }}
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "{{ include "hcl-dx-deployment.ports.persistence.metrics" . }}"
+        prometheus.io/scrape: "true"
+        {{- end }}
+      labels:
+      {{- if (.Values.labels.pod.persistenceNode) }}
+      {{- range $customLabelValue := .Values.labels.pod.persistenceNode }}
+        {{ $customLabelValue.key }} : {{ $customLabelValue.value | quote }}
+      {{- end }}
+      {{- end }}
+        app: "{{ .Release.Name }}-persistence-node"
+            # Using general labels, see _helpers.tpl
+        {{- include "hcl-dx-deployment.labels" . | nindent 8 }}
+    spec:
+      {{- if not (empty (include "hcl-dx-deployment.serviceAccountName" .)) }}  
+      # Service account for pod
+      serviceAccountName: {{ include "hcl-dx-deployment.serviceAccountName" . }}
+      {{- end }}
+      {{- if (.Values.nodeSelector) }}
+      {{- if (.Values.nodeSelector.persistenceNode)}}
+      nodeSelector:
+        {{- toYaml (.Values.nodeSelector.persistenceNode) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.affinity) }}
+      {{- if (.Values.affinity.persistenceNode)}}
+      affinity:
+        {{- toYaml (.Values.affinity.persistenceNode) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.nodeName) }}
+      {{- if (.Values.nodeName.persistenceNode)}}
+      nodeName:
+        {{- toYaml (.Values.nodeName.persistenceNode) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.tolerations) }}
+      {{- if (.Values.tolerations.persistenceNode)}}
+      tolerations:
+        {{- toYaml (.Values.tolerations.persistenceNode) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if (.Values.topologySpreadConstraints) }}
+      {{- if (.Values.topologySpreadConstraints.persistenceNode)}}
+      topologySpreadConstraints:
+        {{- toYaml (.Values.topologySpreadConstraints.persistenceNode) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- include "hcl-dx-deployment.imagePullSecret" . | nindent 6}}
+      {{- if (.Values.hostAliases) }}
+      {{- if (.Values.hostAliases.persistenceNode)}}
+      hostAliases:
+        {{- toYaml (.Values.hostAliases.persistenceNode) | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- if .Values.configuration.digitalAssetManagement.newDbManagement }}
+      # Managed by the runtime controller should get more time to shut down
+      terminationGracePeriodSeconds: 120
+      {{- else }}
+      terminationGracePeriodSeconds: 10
+      {{- end }}
+      securityContext:
+        fsGroup: 1001
+        runAsUser: 1000
+        runAsGroup: 1001
+        runAsNonRoot: true
+        supplementalGroups:
+        - 1001
+      {{- if eq (.Values.configuration.digitalAssetManagement.newDbManagement) true }}
+      initContainers:
+        # Init container to create the database directory and set permissions
+        - name: "persistence-node-init"
+          # Build the image attribute by using the repository and image tag
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.persistenceNode }}:{{ .Values.images.tags.persistenceNode }}"
+          # Adjust the image pull policy based on the Chart value
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          command: ["/init_container.sh"]
+          volumeMounts:
+          - name: "database"
+            mountPath: "/var/lib/pgsql/11/data"
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+      {{- end }}
+      containers:
+        - name: "persistence-node"
+          # Build the image attribute by using the repository and image tag
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.persistenceNode }}:{{ .Values.images.tags.persistenceNode }}"
+          # Adjust the image pull policy based on the Chart value
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          # Add lifecycle hooks
+          {{- if eq (.Values.configuration.digitalAssetManagement.newDbManagement) true }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - "/bin/sh"
+                  - "-c"
+                  - "/opt/hooks/pre-stop.sh"
+          {{- end }}
+          # Environment parameters
+          env:
+          {{- if (.Values.environment.pod.persistenceNode) }}
+          {{- range $customEnvironmentValue := .Values.environment.pod.persistenceNode }} 
+            - name: {{ $customEnvironmentValue.name }} 
+              value: {{ $customEnvironmentValue.value | quote }}
+          {{- end }}
+          {{- end }}
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+          {{- if ne (.Values.configuration.digitalAssetManagement.newDbManagement) true }}
+            - name: "REPMGR_HEADLESS_SVC"
+              value: "{{ .Release.Name }}-persistence-headless-svc.{{ .Release.Namespace }}.svc.cluster.local"
+            - name: "REPMGR_PARTNER_NODES"
+              {{ $persistenceNodeReplicas := .Values.scaling.replicas.persistenceNode | int }}
+              {{ $releaseName := .Release.Name }}
+              value: "{{ range $i, $e:= until $persistenceNodeReplicas }}{{ $releaseName }}-persistence-node-{{ $i }};{{ end }}"
+            - name: "POSTGRES_USER"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-user"
+            - name: "POSTGRES_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-user"
+            - name: "POSTGRES_USER_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-user-previous-value"
+            - name: "POSTGRES_PASSWORD_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-user-previous-value"
+            - name: "POSTGRES_REPLICATION_USER"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-replication"
+            - name: "POSTGRES_REPLICATION_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-replication"
+            - name: "POSTGRES_REPLICATION_USER_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-replication-previous-value"
+            - name: "POSTGRES_REPLICATION_PASSWORD_PREVIOUS_VALUE"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-replication-previous-value"
+            - name: "DAM_USER"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-dam-user"
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.persistenceNode | quote }} 
+            # Environment variable for new DB management mode
+            - name: "NEW_DB_MANAGEMENT"
+              value: {{ .Values.configuration.digitalAssetManagement.newDbManagement | quote }}
+            {{- if eq (include "hcl-dx-deployment.iqEnabled" .) "true" }}
+            - name: "IQ_DB_USER"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  {{- if .Values.incubator.security.iq.customDbSecret }}
+                  name: "{{ .Values.incubator.security.iq.customDbSecret }}"
+                  {{- else }}
+                  name: "{{ .Release.Name }}-iq-db-secret"
+                  {{- end }}
+            - name: "IQ_DB_PASSWORD"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  {{- if .Values.incubator.security.iq.customDbSecret }}
+                  name: "{{ .Values.incubator.security.iq.customDbSecret }}"
+                  {{- else }}
+                  name: "{{ .Release.Name }}-iq-db-secret"
+                  {{- end }}
+            {{- end }}
+          # Port exposure configuration
+          ports:
+            - name: "persistence"
+              containerPort: {{ include "hcl-dx-deployment.ports.persistence.repmgr" . }}
+          # Liveness probe
+          livenessProbe:
+          {{- if (.Values.maintenanceMode.persistenceNode) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            exec:
+              command:
+                - "/live.sh"
+          {{- with .Values.probes.persistenceNode.livenessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          # Readiness probe
+          readinessProbe:
+          {{- if (.Values.maintenanceMode.persistenceNode) }}
+            exec:
+              command:
+                - "true"
+          {{- else }}
+            exec:
+              command:
+                - "/ready.sh"
+          {{- with .Values.probes.persistenceNode.readinessProbe }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- end }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.persistenceNode.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.persistenceNode.requests.cpu }}"
+              memory: "{{ .Values.resources.persistenceNode.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.persistenceNode.limits) }}
+            limits:
+              {{- if (.Values.resources.persistenceNode.limits.cpu) }}
+              cpu: "{{ .Values.resources.persistenceNode.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.persistenceNode.limits.memory) }}
+              memory: "{{ .Values.resources.persistenceNode.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "database"
+            mountPath: "/var/lib/pgsql/11/data"
+          - name: "config"
+            mountPath: "/etc/config"
+          - name: "global-config"
+            mountPath: "/etc/global-config"
+          - name: "sharedmemorymount"
+            mountPath: "/dev/shm" 
+          {{- if eq (.Values.configuration.digitalAssetManagement.newDbManagement) true }}
+          - name: replication-user-secret
+            mountPath: /etc/replication-user-secret
+            readOnly: true
+          {{- end }}
+        # Sidecar container that exports the prometheus compatible metrics of the postgres node
+        {{- if and (.Values.metrics.persistence.scrape)}}
+        - name: "persistence-metrics-exporter"
+          # Build the image attribute by using the repository and image tag
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.persistenceMetricsExporter }}:{{ .Values.images.tags.persistenceMetricsExporter }}"
+          # Adjust the image pull policy based on the Chart value
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          # Environment parameters
+          env:
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: DATA_SOURCE_URI
+              value: "127.0.0.1:{{ include "hcl-dx-deployment.ports.persistence.repmgr" . }}/{{ include "hcl-dx-deployment.damDatabaseName" . }}?sslmode=disable"
+            - name: "DATA_SOURCE_PASS"
+              valueFrom:
+                secretKeyRef:
+                  key: "password"
+                  name: "{{ .Release.Name }}-persistence-user"
+            - name: "DATA_SOURCE_USER"
+              valueFrom:
+                secretKeyRef:
+                  key: "username"
+                  name: "{{ .Release.Name }}-persistence-user"
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.persistenceNode | quote }} 
+          # Port exposure configuration
+          ports:
+            - name: metrics
+              containerPort: {{ include "hcl-dx-deployment.ports.persistence.metrics" . }}
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.persistenceMetricsExporter.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.persistenceMetricsExporter.requests.cpu }}"
+              memory: "{{ .Values.resources.persistenceMetricsExporter.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.persistenceMetricsExporter.limits) }}
+            limits:
+              {{- if (.Values.resources.persistenceMetricsExporter.limits.cpu) }}
+              cpu: "{{ .Values.resources.persistenceMetricsExporter.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.persistenceMetricsExporter.limits.memory) }}
+              memory: "{{ .Values.resources.persistenceMetricsExporter.limits.memory }}"
+              {{- end }}
+            {{- end }}
+        {{- end }}
+        - name: "persistence-repmgr-log"
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.loggingSidecar }}:{{ .Values.images.tags.loggingSidecar }}"
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          env:
+          {{- if (.Values.configuration.containerTimezone) }}
+            - name: TZ
+              value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+            - name: "MAINTENANCE_MODE"
+              value: {{ .Values.maintenanceMode.persistenceNode | quote }}
+          command: ["/bin/sh"]
+          args: ["-c", "find_and_tail.sh '/var/lib/pgsql/11/data/16/data/dx/repmgr/log/repmgr.log'"]
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.loggingSidecar.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.loggingSidecar.requests.cpu }}"
+              memory: "{{ .Values.resources.loggingSidecar.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.loggingSidecar.limits) }}
+            limits:
+              {{- if (.Values.resources.loggingSidecar.limits.cpu) }}
+              cpu: "{{ .Values.resources.loggingSidecar.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.loggingSidecar.limits.memory) }}
+              memory: "{{ .Values.resources.loggingSidecar.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+            - name: "database"
+              mountPath: "/var/lib/pgsql/11/data"
+        {{- if .Values.configuration.prereqsChecker.enabled }}
+        - name: "prereqs-checker"
+          image: "{{- include "hcl-dx-deployment.imageRepository" . }}/{{ .Values.images.names.prereqsChecker }}:{{ .Values.images.tags.prereqsChecker }}"
+          imagePullPolicy: "{{ .Values.images.pullPolicy }}"
+          env:
+          {{- if (.Values.configuration.containerTimezone) }}
+          - name: TZ
+            value: {{ .Values.configuration.containerTimezone }}
+          {{- end }}
+          - name: "CHECK_SCHEDULE"
+            value: "{{ .Values.configuration.prereqsChecker.checkSchedule }}"
+          - name: "THRESHOLD_LATENCY_MS"
+            value: "3"
+          - name: "THRESHOLD_RANDOM_READ_IOPS"
+            value: "1800"
+          - name: "THRESHOLD_RANDOM_WRITE_IOPS"
+            value: "600"
+          - name: "THRESHOLD_SPACE_CONSUMED_PERCENT"
+            value: "80"
+          - name: "PERFORM_FILE_PERMISSION_CHECK"
+            value: "true"
+          - name: "PERFORM_SOFTLINK_HARDLINK_CHECK"
+            value: "true"
+          - name: "DATABASE_CAPACITY"
+            value: "{{ .Values.volumes.persistenceNode.database.requests.storage }}"
+          - name: "MAINTENANCE_MODE"
+            value: {{ .Values.maintenanceMode.persistenceNode | quote }} 
+          resources:
+            # Resource requests taken from value settings
+            {{- if (.Values.resources.prereqsChecker.requests) }}
+            requests:
+              cpu: "{{ .Values.resources.prereqsChecker.requests.cpu }}"
+              memory: "{{ .Values.resources.prereqsChecker.requests.memory }}"
+            {{- end }}
+            # Resource limits taken from value settings
+            {{- if (.Values.resources.prereqsChecker.limits) }}
+            limits:
+              {{- if (.Values.resources.prereqsChecker.limits.cpu) }}
+              cpu: "{{ .Values.resources.prereqsChecker.limits.cpu }}"
+              {{- end }}
+              {{- if (.Values.resources.prereqsChecker.limits.memory) }}
+              memory: "{{ .Values.resources.prereqsChecker.limits.memory }}"
+              {{- end }}
+            {{- end }}
+          volumeMounts:
+          - name: "database"
+            mountPath: "/mnt/prereqs-checks-volumes/database"
+        {{- end }}
+      volumes:
+      - name: "config"
+        configMap:
+          name: "{{ .Release.Name }}-persistence-node"
+      - name: "global-config"
+        configMap:
+          name: "{{ .Release.Name }}-global"
+      - name:  "sharedmemorymount"
+        emptyDir:
+          medium: Memory
+          sizeLimit: "{{ .Values.volumes.persistenceNode.sharedmemorymount.sizeLimit }}"
+      # Only mount the replication user secret if we are in new DB management mode
+      {{- if eq (.Values.configuration.digitalAssetManagement.newDbManagement) true }}
+      - name: "replication-user-secret"
+        secret:
+          secretName: "{{ .Release.Name }}-persistence-replication"
+      {{- end }}
+{{- end }}

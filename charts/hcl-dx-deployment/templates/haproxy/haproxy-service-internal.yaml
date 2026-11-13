@@ -1,0 +1,40 @@
+#********************************************************************
+#* Licensed Materials - Property of HCL                             *
+#*                                                                  *
+#* Copyright HCL Technologies Ltd. 2024. All Rights Reserved.       *
+#*                                                                  *
+#* Note to US Government Users Restricted Rights:                   *
+#*                                                                  *
+#* Use, duplication or disclosure restricted by GSA ADP Schedule    *
+#********************************************************************
+
+# This template creates:
+# Resources: Service
+# For Service: HAProxy
+# This Service is only used when internal calls are routed through HAProxy.
+# This makes sure that a custom servicePort for the main service does not break the internal calls.
+# We use the dxHomeSecure port for the servicePort to not cause any undefined virtual host errors in Core
+
+{{- if and (eq (include "hcl-dx-deployment.haproxyEnabled" .) "true") .Values.networking.addon.internalCallsUseHaproxy }}
+
+apiVersion: "v1"
+kind: "Service"
+metadata:
+  name: "{{ .Release.Name }}-haproxy-internal"
+  labels:
+    app: "{{ .Release.Name }}-haproxy"
+    # Using general labels, see _deployment_helpers.tpl
+    {{- include "hcl-dx-deployment.labels" . | nindent 4 }}
+spec:
+  ports:
+    - name: "haproxy"
+      {{- if eq (include "hcl-dx-deployment.webEngineEnabled" .) "true" }}
+      port: {{ include "hcl-dx-deployment.ports.webEngine.dxHomeSecure" . }}
+      {{- else }}
+      port: {{ include "hcl-dx-deployment.ports.core.dxHomeSecure" . }}
+      {{- end }}
+      targetPort: {{ include "hcl-dx-deployment.ports.haproxy.serverContainerPort" . }}
+  selector:
+    app: "{{ .Release.Name }}-haproxy"
+
+{{- end }}
