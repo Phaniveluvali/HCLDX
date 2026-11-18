@@ -325,20 +325,20 @@ hostAliases:
 scaling:
   # The default amount of replicas per application
   replicas:
-    contentComposer: 1
-    core: 1
-    damPluginGoogleVision: 1
-    digitalAssetManagement: 1
-    imageProcessor: 1
-    ringApi: 1
-    persistenceConnectionPool: 1
-    runtimeController: 1
+    contentComposer: 0
+    core: 0
+    damPluginGoogleVision: 0
+    digitalAssetManagement: 0
+    imageProcessor: 0
+    ringApi: 0
+    persistenceConnectionPool: 0
+    runtimeController: 0
     # you should not increase the number of persistence node to more than 5
-    persistenceNode: 1
-    haproxy: 1
-    licenseManager: 1
-    damPluginKaltura: 1
-    webEngine: 1
+    persistenceNode: 0
+    haproxy: 0
+    licenseManager: 0
+    damPluginKaltura: 0
+    webEngine: 0
   # Automated scaling using HorizontalPodAutoScaler
   horizontalPodAutoScaler:
     # Autoscaling settings for Content Composer
